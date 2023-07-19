@@ -12,13 +12,13 @@ proc runCommand*(v: Values) =
     size = filePath.getFileSize
   var toStdout = v.has("output") == false
   if toStdout and size > 100000:
-    if not promptConfirm("Big things ahead ($1)! Are you sure you want to continue?" % [size.formatSize()]):
+    if not promptConfirm("Big things printing to stdout ($1)! Continue?" % [size.formatSize()]):
       QuitFailure.quit
     toStdout = true
   let
-    content = filePath.readFile
+    content = readFile(filePath)
     minify =
-      if v.flag("minify") == false: false
+      if v.flag("min") == false: false
       else: true
   let
     t = cpuTime()
@@ -47,6 +47,8 @@ proc runCommand*(v: Values) =
       elif output.endsWith(".json"):
         # build a JSON from Markdown
         discard # todo
+      else:
+        display("Unknown extension. Use either .html, .json or .pdf")
     else:
       display("Invalid `output` path")
       QuitFailure.quit

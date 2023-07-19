@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 import pkg/toktok
-import std/[os, tables, uri, htmlgen, json]
+import std/[os, tables, critbits, uri, htmlgen, unidecode, json]
 
 when not defined release:
   import std/[jsonutils]
@@ -22,7 +22,7 @@ handlers:
     lex.kind = kind
 
 const settings =
-  toktok.Settings(
+  Settings(
     tkPrefix: "tk",
     keepChar: true,
     keepUnknown: true,
@@ -48,10 +48,7 @@ registerTokens settings:
   ulm = '*' # alt prefix for ul
   ol # ordered list prefixed with numbers
   backSlash = '/'
-  # colon = ':':
-    # uripath = "//"
-  http = "http"
-  https = "https"
+  excl = '!'
   # strike = "~~" .. "~~"
   # highlight = "==" .. "=="
   paragraph
@@ -71,12 +68,12 @@ type
     ntInner
     ntBold = "b"
     ntBr = "br"
+    ntBlockQuote = "blockquote"
     ntHeading = "h"
     ntHr = "hr"
     ntHtml
-    ntLink = "a"
+    ntLink
     ntItalic = "em"
-    ntImage = "img"
     ntOl = "ol"
     ntParagraph = "p"
     ntUl
@@ -85,14 +82,12 @@ type
     case nt: NodeType
     of ntHeading:
       hlvl: TokenKind # from tkH1 - tkH6
-      hInner: seq[Node]
+      headingNodes: seq[Node]
     of ntLink:
       link: Uri
       linkTitle: string
       linkNodes: seq[Node]
-    of ntImage:
-      img: string
-      imgAttrs: seq[string]
+      isImage: bool
     of ntUl, ntOl:
       list: seq[Node]
     of ntText:
@@ -101,7 +96,7 @@ type
       inner: seq[Node]
     of ntParagraph:
       pNodes: seq[Node]
-    of ntBold, ntItalic:
+    of ntBold, ntItalic, ntBlockQuote:
       inlineNodes: seq[Node]
     else: discard
     indent: int
@@ -109,27 +104,40 @@ type
   Markdown* = object
     source: string
     nodes: seq[Node]
+    opts: MarkdownOptions
+    when compileOption("app", "lib"):
+      idSelectors: TableRef[string, Node]
+
+  MarkdownOptions* = object
+    allowed*: seq[string] # a list of HTML tag names
+    useAnchors*: bool     # enable/disable anchor in title blocks
 
   Parser* = object
     lex: Lexer
     md: Markdown
     prev, curr, next: TokenTuple
     errors: tuple[status: bool, msg: string, line, col: int]
-    allowedTags: seq[string]
 
   PrefixFunction = proc(p: var Parser): Node
   MarkdownException* = object of CatchableError
 
 var nl = "\n"
-let inlineNodes = {
-  "b": Node(nt: ntBold),
-  "i": Node(nt: ntItalic),
-  "bold": Node(nt: ntBold),
-  "em": Node(nt: ntItalic),
-}.toTable
+let
+  defaultMarkdownOptions* =
+    MarkdownOptions(
+      allowed: @["em", "i", "b", "u", "bold", "blockquote"],
+      useAnchors: true
+    )
+  inlineNodes = {
+    "b": Node(nt: ntBold),
+    "i": Node(nt: ntItalic),
+    "bold": Node(nt: ntBold),
+    "em": Node(nt: ntItalic),
+  }.toTable
 
 # fwd declaration
-proc callPrefixNode(p: var Parser, isRoot = true): Node
+proc getRootPrefix(p: var Parser): Node
+proc getPrefix(p: var Parser): Node
 
 #
 # AST nodes
@@ -191,31 +199,50 @@ proc isSecondLine(p: var Parser, left: TokenTuple): bool =
   result = (p.curr.line - left.line == 1) and p.curr isnot tkEOF
 
 proc isAllowed(p: var Parser, tk: TokenTuple): bool =
-  result = tk.value in p.allowedTags
+  result = tk.value in p.md.opts.allowed
+
+template stackSelectorId(id: string, node: Node) =
+  when compileOption("app", "lib"):
+    md.idSelectors[slug] = md.nodes[n]
+
+proc slugify(input: string, lowercase = true, sep = "-"): string =
+  # Convert input string to a slug
+  let s = unidecode(input)
+  result = newStringOfCap(s.len)
+  for c in s:
+    case c
+    of Whitespace:
+      if result[^1] != '-':
+        result.add(sep)
+    of Letters:
+      result.add if lowercase: c.toLowerAscii else: c
+    of Digits:
+      result.add c
+    else:
+      discard
 
 #
 # parse handlers
 #
+proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
+  while p.isSameLine(tk):
+    let node = p.getPrefix()
+    if likely(node != nil):
+      add parentNodes, node
+
 proc parseHeading(p: var Parser): Node =
   # Parse headings
   let tk = p.curr
   walk p
-  result = newHeading(p.prev.kind)
-  while p.isSameLine(tk):
-    case p.curr.kind
-    of tkIdentifier, tkH1, tkH2, tkH3, tkH4, tkH5, tkH6, tkUnknown:
-      add result.hInner, Node(nt: ntText, text: indent(p.curr.value, p.curr.wsno))
-    else: discard
-    walk p
+  result = newHeading(tk.kind)
+  p.parseInline(tk, result.headingNodes)
 
 proc parseParagraph(p: var Parser): Node =
   # Pars paragraphs
   result = Node(nt: ntParagraph)
   let tk = p.curr
   var innerNode = Node(nt: ntInner)
-  while p.isSameLine(tk):
-    add innerNode.inner, Node(nt: ntText, text: indent(p.curr.value, p.curr.wsno))
-    walk p
+  p.parseInline(tk, innerNode.inner)
   if p.isSecondLine(tk) and p.curr notin {tkUl, tkUlp, tkUlm}:
     if p.curr.wsno == 0:
       inc p.curr.wsno
@@ -223,14 +250,22 @@ proc parseParagraph(p: var Parser): Node =
       # add a hard line break
       add innerNode.inner, Node(nt: ntBr)
       dec p.curr.wsno, p.curr.wsno # wsno not needed 
-    while p.isSecondLine(tk):
-      add innerNode.inner, Node(nt: ntText, text: indent(p.curr.value, p.curr.wsno))
-      walk p
+    p.parseInline(tk, innerNode.inner)
   add result.pNodes, innerNode
+
+proc parseBlockquote(p: var Parser): Node =
+  let tk = p.curr
+  result = Node(nt: ntBlockQuote)
+  walk p
+  while p.isSameLine(tk):
+    let node = p.getPrefix()
+    if likely(node != nil):
+      add result.inlineNodes, node
+    else: result = nil
 
 proc parseList(p: var Parser, tk: TokenTuple, innerNode: Node) =
   while p.isSameLine(tk):
-    let node = p.callPrefixNode(isRoot = false)
+    let node = p.getPrefix()
     if likely(node != nil):
       add innerNode.inner, node
 
@@ -266,7 +301,7 @@ proc parseTag(p: var Parser): Node =
     while p.curr isnot tkLT and p.next.kind != tkBackSlash:
       if p.curr is tkEOF:
         p.error "EOF reached before closing HTML tag", p.curr
-      let node = p.callPrefixNode(isRoot = false)
+      let node = p.getPrefix()
       if likely(node != nil):
         add result.inlineNodes, node
     walk p, 2 # </
@@ -281,15 +316,21 @@ proc parseText(p: var Parser): Node =
   result = Node(nt: ntText, text: indent(p.curr.value, p.curr.wsno))
   walk p
 
-proc parseLink(p: var Parser): Node =
-  # Parse link formats `[Label](https://example.com "Example")`
+proc parseMedia(p: var Parser, isImage: bool): Node =
+  # Parse links `[Label](https://example.com "Example")`
+  # and images `![Alt text](https://example.com/img.jpg "Some image")`
   let tk = p.curr
   var innerNodes: seq[Node]
   walk p
-  while p.curr isnot tkRB:
-    let node = p.callPrefixNode(isRoot = false)
+  while p.curr.line == tk.line and p.curr isnot tkRB:
+    if p.curr is tkEOF:
+      return Node(nt: ntText, text: "!")
+    let node = p.getPrefix()
     if likely(node != nil):
       add innerNodes, node
+  if p.curr isnot tkRB:
+    innerNodes.insert(Node(nt: ntText, text: "!"), 0)
+    return Node(nt: ntInner, inner: innerNodes)
   walk p # ]
   if p.curr is tkLP:
     walk p
@@ -298,26 +339,38 @@ proc parseLink(p: var Parser): Node =
     # parse link address
     while p.curr notin {tkRP, tkString}:
       if p.curr is tkEOF:
-        p.error("EOF reached before closing URL tag", p.curr)
+        p.error("EOF reached before closing tag", p.curr)
       add address, p.curr.value
       walk p
-    
+
     # parse link title, if available
     if p.curr is tkString:
       add result.linkTitle, p.curr.value
       walk p
-
     result.link = parseUri(address)
     result.linkNodes = innerNodes
     result.indent = tk.wsno
+    result.isImage = isImage
     walk p # )
   else:
     result = Node(nt: ntText)
 
-proc parsePrefix(p: var Parser, isRoot: bool): PrefixFunction =
-  result =
+proc parseLink(p: var Parser): Node =
+  p.parseMedia(false)
+
+proc parseImage(p: var Parser): Node =
+  if p.next.kind == tkLB:
+    walk p # !
+  else:
+    walk p
+    return Node(nt: ntText, text: "!")
+  p.parseMedia(true)
+
+proc getRootPrefix(p: var Parser): Node =
+  let callPrefixFn = 
     case p.curr.kind
-    of tkH1, tkH2, tkH3, tkH4, tkH5, tkH6:
+    of tkH1, tkH2, tkH3,
+       tkH4, tkH5, tkH6:
       parseHeading
     of tkUl:
       parseUl
@@ -332,14 +385,26 @@ proc parsePrefix(p: var Parser, isRoot: bool): PrefixFunction =
       else: parseParagraph
     of tkLB:
       parseLink
-    else:
-      if isRoot:  parseParagraph
-      else:       parseText
+    of tkGT:
+      parseBlockquote
+    of tkExcl:
+      parseImage
+    else: parseParagraph
+  let node = callPrefixFn(p)
+  case node.nt
+  of ntUl, ntOl, ntHeading, ntParagraph:
+    result = node
+  else:
+    result = Node(nt: ntParagraph, pNodes: @[node])
 
-proc callPrefixNode(p: var Parser, isRoot = true): Node =
-  let callPrefixFn = p.parsePrefix(isRoot)
-  if likely(callPrefixFn != nil):
-    result = callPrefixFn(p)
+proc getPrefix(p: var Parser): Node =
+  let callPrefixFn = 
+    case p.curr.kind
+    of tkLB:
+      parseLink
+    else:
+      parseText
+  callPrefixFn(p)
 
 #
 # Writers
@@ -354,35 +419,47 @@ proc writeInnerNode(node: Node): string =
   case node.nt
   of ntLink:
     let label = writeInnerNodes(node.linkNodes)
-    if unlikely(node.linkTitle.len > 0):
-      result = indent(a(href = $(node.link), title = node.linkTitle, label), node.indent)
+    if unlikely(node.isImage):
+      if node.linkTitle.len > 0:
+        result = indent(img(src = $(node.link), alt=label, title=node.linkTitle), node.indent)
+      else:
+        result = indent(img(src = $(node.link), alt=label), node.indent)
     else:
-      result = indent(a(href = $(node.link), label), node.indent)
+      if node.linkTitle.len > 0:
+        result = indent(a(href = $(node.link), title=node.linkTitle, label), node.indent)
+      else:
+        result = indent(a(href = $(node.link), label), node.indent)
   of ntText:
-    result = node.text 
+    result = node.text
+  of ntInner:
+    add result, writeInnerNodes(node.inner)
   of ntBr:
-    result = br() # break line
+    result = br()
   else: discard
 
 #
 # Public API
 #
-proc newMarkdown*(content: string, minify = true): Markdown =
+proc newMarkdown*(content: string, minify = true, opts: MarkdownOptions = defaultMarkdownOptions): Markdown =
   ## Create a new `Markdown` document from `content`
-  var p = Parser(lex: Lexer.init(content), allowedTags: @["em", "i", "b", "u", "bold", "blockquote"])
+  var p = Parser(lex: Lexer.init(content), md: Markdown(opts: opts))
   p.curr = p.lex.getToken()
   p.next = p.lex.getToken()
-  if minify: nl = "" 
+  when compileOption("app", "lib"):
+    p.md.idSelectors = newTable[string, Node]()
+    p.md.classSelectors = newTable[string, Node]()
+  if minify: nl = "" # remove `\n`
   while p.curr isnot tkEOF:
     if p.errors.status: break # catch the wet bandits!
-    let node = p.callPrefixNode()
+    let node = p.getRootPrefix()
     if likely(node != nil):
       p.md.nodes.add(node)
   if p.errors.status:
     let meta = "[" & $(p.errors.line) & ":" & $(p.errors.col) & "]"
     raise newException(MarkdownException, meta & p.errors.msg.indent(1))
   result = p.md
-  # nl = "\n" # revert nl
+  nl = "\n" # revert `\n`
+  reset(p)
 
 proc toHtml*(md: Markdown): string =
   ## Converts `Markdown` document to HTML
@@ -391,41 +468,44 @@ proc toHtml*(md: Markdown): string =
     var el: string
     let nt = md.nodes[n].nt
     case nt
+    of ntParagraph:
+      for pNode in md.nodes[n].pNodes:
+        add result, p(writeInnerNode(pNode))
     of ntHeading:
-      for inner in md.nodes[n].hInner:
+      for inner in md.nodes[n].headingNodes:
         case inner.nt
           of ntText:
             add el, inner.text
           else: discard
+      if md.opts.useAnchors:
+        el = el.strip
+        let slug = slugify(el)
+        stackSelectorId(slug, md.nodes[n])
+        el = a(id=slug, class="anchor", href="#" & slug) & el # todo `aria-hidden` is not recognized in htmlgen
       add result,
         case md.nodes[n].hlvl:
-          of tkH1: h1(el.strip)
-          of tkH2: h2(el.strip)
-          of tkH3: h3(el.strip)
-          of tkH4: h4(el.strip)
-          of tkH5: h5(el.strip)
-          else: h6(el.strip)
+          of tkH1: h1(el)
+          of tkH2: h2(el)
+          of tkH3: h3(el)
+          of tkH4: h4(el)
+          of tkH5: h5(el)
+          else: h6(el)
     of ntUl, ntOl:
-      var lists: seq[string]
+      var lists: string
       for node in md.nodes[n].list:
         var el: string
         for innerNode in node.inner:
           add el, writeInnerNode(innerNode)
-        add lists, li(el.strip)
+        add lists, li(el.strip) & nl
       if nt == ntUl:
-        add result, ul(lists.join(nl))
+        add result, ul(nl, lists)
       else:
-        add result, ol(lists.join(nl))
-    of ntParagraph:
-      for pNode in md.nodes[n].pNodes:
-        var el: string
-        for innerNode in pNode.inner:
-          case innerNode.nt
-          of ntBr:
-            add el, br()
-          else:
-            add el, innerNode.text
-        add result, p(el.strip)
+        add result, ol(nl, lists)
+    of ntBlockQuote:
+      var el: string
+      for node in md.nodes[n].inlineNodes:
+        add el, writeInnerNode(node)
+      add result, blockquote(el.strip)
     of ntBold:
       var content: string
       for inlineNode in md.nodes[n].inlineNodes:
@@ -445,6 +525,7 @@ proc toHtml*(md: Markdown): string =
     of ntBr:
       add result, br()
     else: discard
+    setLen(el, 0)
     if n < len: add result, nl
 
 proc `$`*(md: Markdown): string = toHtml(md)
