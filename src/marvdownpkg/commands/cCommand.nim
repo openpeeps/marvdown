@@ -31,6 +31,8 @@ proc runCommand*(v: Values) =
       if output.endsWith(".html") or output.endsWith(".htm"):
         # build a HTML from Markdown
         writeFile(output, md.toHtml)
+        if v.flag("watch"):
+          runServer(filePath, output, 120)
       elif output.endsWith(".pdf"):
         # build a PDF from Markdown
         initPDF()
