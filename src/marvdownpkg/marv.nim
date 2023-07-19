@@ -43,14 +43,14 @@ registerTokens settings:
   lt = tokenize(ltgt, '<')
   gt = tokenize(ltgt, '>')
   pipe = '|'
-  ul = '-' # unordered list
-  ulp = '+' # alt prefix for ul
-  ulm = '*' # alt prefix for ul
-  ol # ordered list prefixed with numbers
+  ul = '-'    # unordered list
+  ulp = '+'   # alt prefix for ul
+  ulm = '*':  # alt prefix for ul
+    bold = '*'
+  ol          # ordered list prefixed with numbers
   backSlash = '/'
   excl = '!'
-  # strike = "~~" .. "~~"
-  # highlight = "==" .. "=="
+  # strike = "~~"
   paragraph
   h1 = '#': # todo toktok enable `keepChar` for variants
     h2 = '#'
@@ -58,9 +58,6 @@ registerTokens settings:
     h4 = "###"
     h5 = "####"
     h6 = "#####"
-  # bold = "**" .. "**"
-  # italic = '*' .. '*'s
-  # italic2 = '_' .. '_'
 
 type
   NodeType* = enum
@@ -226,9 +223,12 @@ proc slugify(input: string, lowercase = true, sep = "-"): string =
 #
 proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
   while p.isSameLine(tk):
-    let node = p.getPrefix()
-    if likely(node != nil):
-      add parentNodes, node
+    add parentNodes, p.getPrefix()
+
+proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node], toX: TokenKind) =
+  while p.isSameLine(tk) and p.curr isnot toX:
+    add parentNodes, p.getPrefix()
+  if p.curr is toX: walk p
 
 proc parseHeading(p: var Parser): Node =
   # Parse headings
@@ -257,11 +257,12 @@ proc parseBlockquote(p: var Parser): Node =
   let tk = p.curr
   result = Node(nt: ntBlockQuote)
   walk p
-  while p.isSameLine(tk):
-    let node = p.getPrefix()
-    if likely(node != nil):
-      add result.inlineNodes, node
-    else: result = nil
+  p.parseInline(tk, result.inlineNodes)
+  # while p.isSameLine(tk):
+  #   let node = p.getPrefix()
+  #   if likely(node != nil):
+  #     add result.inlineNodes, node
+  #   else: result = nil
 
 proc parseList(p: var Parser, tk: TokenTuple, innerNode: Node) =
   while p.isSameLine(tk):
@@ -360,11 +361,17 @@ proc parseLink(p: var Parser): Node =
 
 proc parseImage(p: var Parser): Node =
   if p.next.kind == tkLB:
-    walk p # !
+    walk p # tkExcl
   else:
-    walk p
+    walk p # tkExcl
     return Node(nt: ntText, text: "!")
   p.parseMedia(true)
+
+proc parseBold(p: var Parser): Node =
+  let tk = p.curr
+  walk p
+  result = Node(nt: ntBold)
+  p.parseInline(tk, result.inlineNodes, tk.kind)
 
 proc getRootPrefix(p: var Parser): Node =
   let callPrefixFn = 
@@ -385,6 +392,8 @@ proc getRootPrefix(p: var Parser): Node =
       else: parseParagraph
     of tkLB:
       parseLink
+    of tkBold:
+      parseBold
     of tkGT:
       parseBlockquote
     of tkExcl:
@@ -400,10 +409,9 @@ proc getRootPrefix(p: var Parser): Node =
 proc getPrefix(p: var Parser): Node =
   let callPrefixFn = 
     case p.curr.kind
-    of tkLB:
-      parseLink
-    else:
-      parseText
+    of tkLB:    parseLink
+    of tkBold:  parseBold
+    else:       parseText
   callPrefixFn(p)
 
 #
@@ -431,6 +439,8 @@ proc writeInnerNode(node: Node): string =
         result = indent(a(href = $(node.link), label), node.indent)
   of ntText:
     result = node.text
+  of ntBold:
+    add result, b(writeInnerNodes(node.inlineNodes))
   of ntInner:
     add result, writeInnerNodes(node.inner)
   of ntBr:
@@ -458,7 +468,6 @@ proc newMarkdown*(content: string, minify = true, opts: MarkdownOptions = defaul
     let meta = "[" & $(p.errors.line) & ":" & $(p.errors.col) & "]"
     raise newException(MarkdownException, meta & p.errors.msg.indent(1))
   result = p.md
-  nl = "\n" # revert `\n`
   reset(p)
 
 proc toHtml*(md: Markdown): string =
@@ -484,12 +493,12 @@ proc toHtml*(md: Markdown): string =
         el = a(id=slug, class="anchor", href="#" & slug) & el # todo `aria-hidden` is not recognized in htmlgen
       add result,
         case md.nodes[n].hlvl:
-          of tkH1: h1(el)
-          of tkH2: h2(el)
-          of tkH3: h3(el)
-          of tkH4: h4(el)
-          of tkH5: h5(el)
-          else: h6(el)
+        of tkH1: h1(el)
+        of tkH2: h2(el)
+        of tkH3: h3(el)
+        of tkH4: h4(el)
+        of tkH5: h5(el)
+        else: h6(el)
     of ntUl, ntOl:
       var lists: string
       for node in md.nodes[n].list:
@@ -527,6 +536,7 @@ proc toHtml*(md: Markdown): string =
     else: discard
     setLen(el, 0)
     if n < len: add result, nl
+  nl = "\n" # revert `\n`
 
 proc `$`*(md: Markdown): string = toHtml(md)
 

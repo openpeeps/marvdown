@@ -7,10 +7,10 @@
 when defined napibuild:
   # Build a native NAPI addon using Denim
   import pkg/denim
-  import marvdown/marv
+  import ./marvdownpkg/marv
 
   init proc(module: Module) =
-    proc md2html(content: string, minify: bool) {.export_napi.} =
+    proc toHtml(content: string, minify: bool) {.export_napi.} =
       ## Parse markdown contents to HTML
       var md = newMarkdown(args.get("content").getStr, args.get("minify").getBool)
       return %* toHtml(md)

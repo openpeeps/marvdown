@@ -20,4 +20,4 @@ requires "httpx", "websocketx"
 requires "watchout"
 
 task bench, "Run some benchmarks":
-  exec "nim c --mm:arc -d:release --opt:speed -d:danger --verbosity:0 -r ./bench/benchmark.nim"
+  exec "nim c --mm:arc --opt:speed -d:danger --verbosity:0 -r ./bench/benchmark.nim"
