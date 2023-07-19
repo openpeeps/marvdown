@@ -48,9 +48,9 @@ registerTokens settings:
   ulm = '*':  # alt prefix for ul
     bold = '*'
   ol          # ordered list prefixed with numbers
-  backSlash = '/'
+  italic
+  `div` = '/'
   excl = '!'
-  # strike = "~~"
   paragraph
   h1 = '#': # todo toktok enable `keepChar` for variants
     h2 = '#'
@@ -74,6 +74,7 @@ type
     ntOl = "ol"
     ntParagraph = "p"
     ntUl
+    ntTag # named tags
 
   Node {.acyclic.} = ref object
     case nt: NodeType
@@ -95,6 +96,9 @@ type
       pNodes: seq[Node]
     of ntBold, ntItalic, ntBlockQuote:
       inlineNodes: seq[Node]
+    of ntTag:
+      tagName: string
+      tagInlineNodes: seq[Node]
     else: discard
     indent: int
 
@@ -125,12 +129,6 @@ let
       allowed: @["em", "i", "b", "u", "bold", "blockquote"],
       useAnchors: true
     )
-  inlineNodes = {
-    "b": Node(nt: ntBold),
-    "i": Node(nt: ntItalic),
-    "bold": Node(nt: ntBold),
-    "em": Node(nt: ntItalic),
-  }.toTable
 
 # fwd declaration
 proc getRootPrefix(p: var Parser): Node
@@ -225,20 +223,21 @@ proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
   while p.isSameLine(tk):
     add parentNodes, p.getPrefix()
 
-proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node], toX: TokenKind) =
-  while p.isSameLine(tk) and p.curr isnot toX:
+proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node], xKind: TokenKind) =
+  while p.isSameLine(tk) and p.curr isnot xKind:
     add parentNodes, p.getPrefix()
-  if p.curr is toX: walk p
+  if p.curr is xKind:
+    walk p
 
 proc parseHeading(p: var Parser): Node =
-  # Parse headings
+  # parse headings `h1`..`h6`
   let tk = p.curr
   walk p
   result = newHeading(tk.kind)
   p.parseInline(tk, result.headingNodes)
 
 proc parseParagraph(p: var Parser): Node =
-  # Pars paragraphs
+  # parse `paragraph` tags
   result = Node(nt: ntParagraph)
   let tk = p.curr
   var innerNode = Node(nt: ntInner)
@@ -246,32 +245,28 @@ proc parseParagraph(p: var Parser): Node =
   if p.isSecondLine(tk) and p.curr notin {tkUl, tkUlp, tkUlm}:
     if p.curr.wsno == 0:
       inc p.curr.wsno
-    elif p.curr.wsno >= 2:
-      # add a hard line break
+    elif p.curr.wsno >= 2: # insert a break tag <br>
       add innerNode.inner, Node(nt: ntBr)
       dec p.curr.wsno, p.curr.wsno # wsno not needed 
     p.parseInline(tk, innerNode.inner)
   add result.pNodes, innerNode
 
 proc parseBlockquote(p: var Parser): Node =
+  # parse `blockquote` tags 
   let tk = p.curr
   result = Node(nt: ntBlockQuote)
   walk p
   p.parseInline(tk, result.inlineNodes)
-  # while p.isSameLine(tk):
-  #   let node = p.getPrefix()
-  #   if likely(node != nil):
-  #     add result.inlineNodes, node
-  #   else: result = nil
 
 proc parseList(p: var Parser, tk: TokenTuple, innerNode: Node) =
+  # parse (un)ordered lists
   while p.isSameLine(tk):
     let node = p.getPrefix()
     if likely(node != nil):
       add innerNode.inner, node
 
 proc parseUl(p: var Parser): Node =
-  # Parse unordered lists
+  # parse unordered lists
   result = newUl()
   while p.curr is tkUl:
     walk p # `-`, `*`, `+`
@@ -281,7 +276,7 @@ proc parseUl(p: var Parser): Node =
     add result.list, innerNode
 
 proc parseOl(p: var Parser): Node =
-  # Parse ordered lists
+  # parse ordered lists
   result = newOl()
   while (p.curr is tkInteger and p.next is tkDot) and p.next.wsno == 0:
     walk p # tkInteger
@@ -292,25 +287,24 @@ proc parseOl(p: var Parser): Node =
     add result.list, innerNode
 
 proc parseTag(p: var Parser): Node =
-  # Parse allowed HTML tags, such as
+  # parse HTML tags,
   # `<b>`, `<em>`, `<strong>`, `<blockquote>`, and so on...
   let tag = p.next
-  result = inlineNodes[tag.value]
+  result = Node(nt: ntTag, tagName: tag.value)
   walk p, 2
   if p.curr is tkGT:
     walk p
-    while p.curr isnot tkLT and p.next.kind != tkBackSlash:
+    while p.curr isnot tkLT and p.next.kind != tkDiv:
       if p.curr is tkEOF:
         p.error "EOF reached before closing HTML tag", p.curr
       let node = p.getPrefix()
-      if likely(node != nil):
-        add result.inlineNodes, node
+      add result.tagInlineNodes, node
     walk p, 2 # </
     if p.curr.value == tag.value:
       if p.next.kind == tkGT:
         walk p, 2
-      else: p.error "Missing `>` for closing HTML tag", p.curr
-    else: p.error "Invalid enclosing tag, expects `</$1>`", p.curr, [$result.nt]
+      # else: p.error "Missing `>` for closing HTML tag", p.curr
+    # else: p.error "Invalid enclosing tag, expects `</$1>`", p.curr, [$result.nt]
 
 proc parseText(p: var Parser): Node =
   # Parse plain text
@@ -373,14 +367,24 @@ proc parseBold(p: var Parser): Node =
   result = Node(nt: ntBold)
   p.parseInline(tk, result.inlineNodes, tk.kind)
 
+proc parseItalic(p: var Parser): Node =
+  let tk = p.curr
+  walk p
+  result = Node(nt: ntItalic)
+  p.parseInline(tk, result.inlineNodes, tk.kind)
+
 proc getRootPrefix(p: var Parser): Node =
   let callPrefixFn = 
     case p.curr.kind
     of tkH1, tkH2, tkH3,
        tkH4, tkH5, tkH6:
       parseHeading
-    of tkUl:
+    of tkUl, tkUlp:
       parseUl
+    of tkUlm:      
+      if p.next.wsno == 0:
+        parseItalic
+      else: parseUl
     of tkInteger:
       if p.next is tkDot and p.next.wsno == 0:
         parseOl
@@ -399,6 +403,7 @@ proc getRootPrefix(p: var Parser): Node =
     of tkExcl:
       parseImage
     else: parseParagraph
+  
   let node = callPrefixFn(p)
   case node.nt
   of ntUl, ntOl, ntHeading, ntParagraph:
@@ -409,9 +414,10 @@ proc getRootPrefix(p: var Parser): Node =
 proc getPrefix(p: var Parser): Node =
   let callPrefixFn = 
     case p.curr.kind
-    of tkLB:    parseLink
-    of tkBold:  parseBold
-    else:       parseText
+    of tkLB:      parseLink
+    of tkBold:    parseBold
+    of tkUlm:     parseItalic
+    else:         parseText
   callPrefixFn(p)
 
 #
@@ -441,6 +447,11 @@ proc writeInnerNode(node: Node): string =
     result = node.text
   of ntBold:
     add result, b(writeInnerNodes(node.inlineNodes))
+  of ntTag:
+    add result,
+      "<" & node.tagName & ">" & writeInnerNodes(node.tagInlineNodes) & "</" & node.tagName & ">"
+  of ntItalic:
+    add result, em(writeInnerNodes(node.inlineNodes))
   of ntInner:
     add result, writeInnerNodes(node.inner)
   of ntBr:
@@ -515,22 +526,6 @@ proc toHtml*(md: Markdown): string =
       for node in md.nodes[n].inlineNodes:
         add el, writeInnerNode(node)
       add result, blockquote(el.strip)
-    of ntBold:
-      var content: string
-      for inlineNode in md.nodes[n].inlineNodes:
-        case inlineNode.nt
-        of ntText:
-          add content, inlineNode.text
-        else: discard # todo
-      add result, p(b(content))
-    of ntItalic:
-      var content: string
-      for inlineNode in md.nodes[n].inlineNodes:
-        case inlineNode.nt
-        of ntText:
-          add content, inlineNode.text
-        else: discard # todo
-      add result, p(em(content))
     of ntBr:
       add result, br()
     else: discard
