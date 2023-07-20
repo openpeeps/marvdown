@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 import pkg/toktok
-import std/[os, tables, critbits, uri, htmlgen, unidecode, json]
+import std/[os, tables, uri, htmlgen, unidecode, json]
 
 when not defined release:
   import std/[jsonutils]
@@ -48,8 +48,10 @@ registerTokens settings:
   ulm = '*':  # alt prefix for ul
     bold = '*'
   ol          # ordered list prefixed with numbers
+  tick = '`'
   italic
   `div` = '/'
+  backslash = '\\'
   excl = '!'
   paragraph
   h1 = '#': # todo toktok enable `keepChar` for variants
@@ -75,6 +77,7 @@ type
     ntParagraph = "p"
     ntUl
     ntTag # named tags
+    ntCode
 
   Node {.acyclic.} = ref object
     case nt: NodeType
@@ -88,7 +91,7 @@ type
       isImage: bool
     of ntUl, ntOl:
       list: seq[Node]
-    of ntText:
+    of ntText, ntCode:
       text: string
     of ntInner:
       inner: seq[Node]
@@ -106,8 +109,7 @@ type
     source: string
     nodes: seq[Node]
     opts: MarkdownOptions
-    when compileOption("app", "lib"):
-      idSelectors: TableRef[string, Node]
+    selectors: TableRef[string, Node]
 
   MarkdownOptions* = object
     allowed*: seq[string] # a list of HTML tag names
@@ -126,7 +128,13 @@ var nl = "\n"
 let
   defaultMarkdownOptions* =
     MarkdownOptions(
-      allowed: @["em", "i", "b", "u", "bold", "blockquote"],
+      allowed: @[
+        "em", "i", "b", "u", "strong", "blockquote",
+        "details", "div", "summary", "kbd", "samp", "sub", "sup",
+        "ins", "del", "var", "q", "dl", "dt", "dd",
+        "table", "thead", "tfoot", "tr", "td",
+        "span", "cite", "br", "code", "pre"
+      ],
       useAnchors: true
     )
 
@@ -196,10 +204,6 @@ proc isSecondLine(p: var Parser, left: TokenTuple): bool =
 proc isAllowed(p: var Parser, tk: TokenTuple): bool =
   result = tk.value in p.md.opts.allowed
 
-template stackSelectorId(id: string, node: Node) =
-  when compileOption("app", "lib"):
-    md.idSelectors[slug] = md.nodes[n]
-
 proc slugify(input: string, lowercase = true, sep = "-"): string =
   # Convert input string to a slug
   let s = unidecode(input)
@@ -215,6 +219,12 @@ proc slugify(input: string, lowercase = true, sep = "-"): string =
       result.add c
     else:
       discard
+
+proc stackSelector(md: Markdown, prefix, name: string, node: Node): string =
+  result = slugify(name)
+  if md.selectors.hasKey(prefix & result):
+    add result, "-" & $(md.selectors.len + 1)
+  md.selectors[prefix & result] = node
 
 #
 # parse handlers
@@ -262,8 +272,7 @@ proc parseList(p: var Parser, tk: TokenTuple, innerNode: Node) =
   # parse (un)ordered lists
   while p.isSameLine(tk):
     let node = p.getPrefix()
-    if likely(node != nil):
-      add innerNode.inner, node
+    add innerNode.inner, node
 
 proc parseUl(p: var Parser): Node =
   # parse unordered lists
@@ -308,8 +317,19 @@ proc parseTag(p: var Parser): Node =
 
 proc parseText(p: var Parser): Node =
   # Parse plain text
-  result = Node(nt: ntText, text: indent(p.curr.value, p.curr.wsno))
+  result = Node(nt: ntText, text: p.curr.value, indent: p.curr.wsno)
   walk p
+
+proc parseCode(p: var Parser): Node =
+  # Parse inline `code` elements
+  let tk = p.curr # tkTick
+  result = Node(nt: ntCode, indent: p.curr.wsno)
+  walk p
+  while p.isSameLine(tk) and p.curr isnot tk.kind:
+    add result.text, p.curr.value
+    walk p
+  if p.curr is tk.kind:
+    walk p
 
 proc parseMedia(p: var Parser, isImage: bool): Node =
   # Parse links `[Label](https://example.com "Example")`
@@ -364,7 +384,7 @@ proc parseImage(p: var Parser): Node =
 proc parseBold(p: var Parser): Node =
   let tk = p.curr
   walk p
-  result = Node(nt: ntBold)
+  result = Node(nt: ntBold, indent: p.curr.wsno)
   p.parseInline(tk, result.inlineNodes, tk.kind)
 
 proc parseItalic(p: var Parser): Node =
@@ -417,6 +437,7 @@ proc getPrefix(p: var Parser): Node =
     of tkLB:      parseLink
     of tkBold:    parseBold
     of tkUlm:     parseItalic
+    of tkTick: parseCode
     else:         parseText
   callPrefixFn(p)
 
@@ -444,9 +465,9 @@ proc writeInnerNode(node: Node): string =
       else:
         result = indent(a(href = $(node.link), label), node.indent)
   of ntText:
-    result = node.text
+    result = indent(node.text, node.indent)
   of ntBold:
-    add result, b(writeInnerNodes(node.inlineNodes))
+    add result, indent(b(writeInnerNodes(node.inlineNodes)), node.indent)
   of ntTag:
     add result,
       "<" & node.tagName & ">" & writeInnerNodes(node.tagInlineNodes) & "</" & node.tagName & ">"
@@ -454,6 +475,8 @@ proc writeInnerNode(node: Node): string =
     add result, em(writeInnerNodes(node.inlineNodes))
   of ntInner:
     add result, writeInnerNodes(node.inner)
+  of ntCode:
+    add result, indent(code(node.text), node.indent)
   of ntBr:
     result = br()
   else: discard
@@ -466,9 +489,7 @@ proc newMarkdown*(content: string, minify = true, opts: MarkdownOptions = defaul
   var p = Parser(lex: Lexer.init(content), md: Markdown(opts: opts))
   p.curr = p.lex.getToken()
   p.next = p.lex.getToken()
-  when compileOption("app", "lib"):
-    p.md.idSelectors = newTable[string, Node]()
-    p.md.classSelectors = newTable[string, Node]()
+  p.md.selectors = newTable[string, Node]()
   if minify: nl = "" # remove `\n`
   while p.curr isnot tkEOF:
     if p.errors.status: break # catch the wet bandits!
@@ -490,17 +511,23 @@ proc toHtml*(md: Markdown): string =
     case nt
     of ntParagraph:
       for pNode in md.nodes[n].pNodes:
-        add result, p(writeInnerNode(pNode))
+        case pNode.nt:
+        of ntLink:
+          if pNode.isImage:
+            add result, writeInnerNode(pNode)
+          else:
+            add result, p(writeInnerNode(pNode))
+        else:
+          add result, p(writeInnerNode(pNode))
     of ntHeading:
       for inner in md.nodes[n].headingNodes:
         case inner.nt
           of ntText:
-            add el, inner.text
+            add el, indent(inner.text, inner.indent)
           else: discard
       if md.opts.useAnchors:
         el = el.strip
-        let slug = slugify(el)
-        stackSelectorId(slug, md.nodes[n])
+        let slug = md.stackSelector("#", el, md.nodes[n])
         el = a(id=slug, class="anchor", href="#" & slug) & el # todo `aria-hidden` is not recognized in htmlgen
       add result,
         case md.nodes[n].hlvl:
