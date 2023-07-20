@@ -20,7 +20,7 @@ proc getScreen(isPDF: bool, outputPath: string): string =
     styleElement = style("*{margin:0; padding:0;}iframe{border:0; position: fixed; width: 100%;height: 100%;}")
     bodyElement = iframe(src="/preview.pdf")
   else:
-    styleElement = style(htmlStyle)
+    styleElement = style(`type`="text/css", htmlStyle)
     bodyElement = main(article(readFile(outputPath)))
     refreshNotifier = `div`(class="marvdown-notifier", style="display:none;",
       `div`(class="marvdown-spinner"),
@@ -58,6 +58,7 @@ proc runServer*(input, output: string, delay: int) =
     display("✨ Changes detected")
     display(file.getPath, indent = 2, br="after")
     let broCommand = execCmdEx("./marvdown " & file.getPath & " " & output)
+    echo broCommand.output
 
   startThread(watchoutCallback, @[input], delay, shouldJoinThread = false)
   display("🪄 The Wet Bandits in Browser: http://localhost:6710", br="after")
@@ -71,7 +72,8 @@ proc runServer*(input, output: string, delay: int) =
         req.send(Http200, "<!DOCTYPE html>" & getScreen(output.endsWith(".pdf"), output), headers = defaults & "content-type: text/html")
       of "/preview.pdf":
         if output.endsWith(".pdf"):
-          req.send(Http200, readFile(output), headers= defaults & "content-type: application/pdf")
+          let pdfContent = readFile(output)
+          req.send(Http200, pdfContent, headers= defaults & "content-type: application/pdf")
         else:
           req.send(Http404)
       of "/marv.png":
@@ -83,6 +85,7 @@ proc runServer*(input, output: string, delay: int) =
           while ws.readyState == Open:
             await ws.send($toUnix(output.getLastModificationTime))
           ws.close()
+          reset(ws)
         except WebSocketClosedError:
           echo "Socket closed"
         except WebSocketProtocolMismatchError:
