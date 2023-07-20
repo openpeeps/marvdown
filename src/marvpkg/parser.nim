@@ -6,6 +6,9 @@
 import pkg/toktok
 import std/[os, tables, uri, htmlgen, unidecode, json]
 
+# from htmlparser import HtmlTag, BlockTags, InlineTags, SingleTags
+import htmlparser {.all.}
+
 when not defined release:
   import std/[jsonutils]
 
@@ -42,13 +45,15 @@ registerTokens settings:
   rc = '}'
   lt = tokenize(ltgt, '<')
   gt = tokenize(ltgt, '>')
+  eq = '='
   pipe = '|'
   ul = '-'    # unordered list
   ulp = '+'   # alt prefix for ul
   ulm = '*':  # alt prefix for ul
     bold = '*'
   ol          # ordered list prefixed with numbers
-  tick = '`'
+  tick = '`':
+    blockCode = "``"
   italic
   `div` = '/'
   backslash = '\\'
@@ -78,6 +83,7 @@ type
     ntUl
     ntTag # named tags
     ntCode
+    ntBlockCode
 
   Node {.acyclic.} = ref object
     case nt: NodeType
@@ -102,8 +108,11 @@ type
     of ntTag:
       tagName: string
       tagInlineNodes: seq[Node]
+      tagAttrs: seq[string]
+    of ntBlockCode:
+      blockCode: seq[string] # a seq of lines
     else: discard
-    indent: int
+    wsno: int
 
   Markdown* = object
     source: string
@@ -111,9 +120,27 @@ type
     opts: MarkdownOptions
     selectors: TableRef[string, Node]
 
+  TagType* = enum
+    tagNone
+    tagAll
+    tagInline
+    tagBlock
+    tagSingle
+
   MarkdownOptions* = object
-    allowed*: seq[string] # a list of HTML tag names
-    useAnchors*: bool     # enable/disable anchor in title blocks
+    allowed*: seq[HtmlTag]
+      ## Allowed HTML tag names. See `defaultMarkdownOptions`
+    allowTagsByType*: TagType
+      ## Allow HTML tags by their types. Default `tagNone`
+      ## This option is not used by default, instead, just a little
+      ## list of `HtmlTag`. See `allowed`
+    allowInlineStyle*: bool
+      ## Allow CSS styling using `style` tag (disabled by default)
+    allowHtmlAttributes*: bool
+      ## Allow using html attributes, `width`, `title` and so on.
+      ## For allowing use of `style` attribute, enable `allowInlineStyle`.
+    useAnchors*: bool
+      ## Enable anchor generation in title blocks (enabled by default)
 
   Parser* = object
     lex: Lexer
@@ -129,12 +156,14 @@ let
   defaultMarkdownOptions* =
     MarkdownOptions(
       allowed: @[
-        "em", "i", "b", "u", "strong", "blockquote",
-        "details", "div", "summary", "kbd", "samp", "sub", "sup",
-        "ins", "del", "var", "q", "dl", "dt", "dd",
-        "table", "thead", "tfoot", "tr", "td",
-        "span", "cite", "br", "code", "pre"
+        tagEm, tagI, tagB, tagU, tagStrong, tagBlockquote,
+        tagDiv, tagKbd, tagSamp, tagSub, tagSup,
+        tagIns, tagDel, tagVar, tagQ, tagDl, tagDt, tagDd,
+        tagTable, tagThead, tagTfoot, tagTr, tagTd,
+        tagSpan, tagCite, tagBr, tagCode, tagPre
       ],
+      # todo add support for tagDetails, tagSummary (only in devel)
+      # https://github.com/nim-lang/Nim/blob/devel/lib/pure/htmlparser.nim
       useAnchors: true
     )
 
@@ -202,7 +231,9 @@ proc isSecondLine(p: var Parser, left: TokenTuple): bool =
   result = (p.curr.line - left.line == 1) and p.curr isnot tkEOF
 
 proc isAllowed(p: var Parser, tk: TokenTuple): bool =
-  result = tk.value in p.md.opts.allowed
+  if p.md.opts.allowed.len > 0:
+    return toHtmlTag(tk.value) in p.md.opts.allowed
+  result = true # warning, this allows use of any tag
 
 proc slugify(input: string, lowercase = true, sep = "-"): string =
   # Convert input string to a slug
@@ -222,7 +253,7 @@ proc slugify(input: string, lowercase = true, sep = "-"): string =
 
 proc stackSelector(md: Markdown, prefix, name: string, node: Node): string =
   result = slugify(name)
-  if md.selectors.hasKey(prefix & result):
+  if unlikely(md.selectors.hasKey(prefix & result)):
     add result, "-" & $(md.selectors.len + 1)
   md.selectors[prefix & result] = node
 
@@ -231,6 +262,10 @@ proc stackSelector(md: Markdown, prefix, name: string, node: Node): string =
 #
 proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
   while p.isSameLine(tk):
+    add parentNodes, p.getPrefix()
+
+proc parseSecondLine(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
+  while p.isSecondLine(tk):
     add parentNodes, p.getPrefix()
 
 proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node], xKind: TokenKind) =
@@ -258,7 +293,7 @@ proc parseParagraph(p: var Parser): Node =
     elif p.curr.wsno >= 2: # insert a break tag <br>
       add innerNode.inner, Node(nt: ntBr)
       dec p.curr.wsno, p.curr.wsno # wsno not needed 
-    p.parseInline(tk, innerNode.inner)
+    p.parseSecondLine(tk, innerNode.inner)
   add result.pNodes, innerNode
 
 proc parseBlockquote(p: var Parser): Node =
@@ -295,39 +330,85 @@ proc parseOl(p: var Parser): Node =
     p.parseList(tk, innerNode)
     add result.list, innerNode
 
+proc parseInnerTag(p: var Parser, parentNode: Node, tag: TokenTuple) =
+  walk p # tkGT
+  while p.curr isnot tkLT and p.next.kind != tkDiv:
+    # if p.curr is tkEOF:
+      # p.error "EOF reached before closing HTML tag", p.curr
+    let node = p.getPrefix()
+    add parentNode.tagInlineNodes, node
+  walk p, 2 # </
+  if p.curr.value == tag.value:
+    if p.next.kind == tkGT:
+      walk p, 2
+    # else: p.error "Missing `>` for closing HTML tag", p.curr
+  # else: p.error "Invalid enclosing tag, expects `</$1>`", p.curr, [$result.nt]
+
 proc parseTag(p: var Parser): Node =
   # parse HTML tags,
   # `<b>`, `<em>`, `<strong>`, `<blockquote>`, and so on...
   let tag = p.next
   result = Node(nt: ntTag, tagName: tag.value)
   walk p, 2
-  if p.curr is tkGT:
-    walk p
-    while p.curr isnot tkLT and p.next.kind != tkDiv:
-      if p.curr is tkEOF:
-        p.error "EOF reached before closing HTML tag", p.curr
-      let node = p.getPrefix()
-      add result.tagInlineNodes, node
-    walk p, 2 # </
-    if p.curr.value == tag.value:
-      if p.next.kind == tkGT:
+  if likely(p.curr is tkGT):
+    p.parseInnerTag(result, tag)
+  elif p.md.opts.allowHtmlAttributes:
+    while p.curr isnot tkGT:
+      let attrName = p.curr
+      var attrValue: string
+      if p.next is tkEQ:
         walk p, 2
-      # else: p.error "Missing `>` for closing HTML tag", p.curr
-    # else: p.error "Invalid enclosing tag, expects `</$1>`", p.curr, [$result.nt]
+      if p.curr is tkString:
+        attrValue = p.curr.value
+        walk p
+      else: walk p # could be an attr without values
+      if likely(attrValue.len != 0):
+        add result.tagAttrs, attrName.value & "=" & "\"" & attrValue & "\""
+      else:
+        add result.tagAttrs, attrName.value
+    if likely(p.curr is tkGT):
+      p.parseInnerTag(result, tag)
 
 proc parseText(p: var Parser): Node =
   # Parse plain text
-  result = Node(nt: ntText, text: p.curr.value, indent: p.curr.wsno)
+  result = Node(nt: ntText, text: p.curr.value, wsno: p.curr.wsno)
   walk p
 
-proc parseCode(p: var Parser): Node =
+proc parseInlineCode(p: var Parser): Node =
   # Parse inline `code` elements
   let tk = p.curr # tkTick
-  result = Node(nt: ntCode, indent: p.curr.wsno)
+  result = Node(nt: ntCode, wsno: p.curr.wsno)
   walk p
   while p.isSameLine(tk) and p.curr isnot tk.kind:
-    add result.text, p.curr.value
+    add result.text, indent(p.curr.value, p.curr.wsno)
     walk p
+  if p.curr is tk.kind:
+    walk p
+
+proc parseBlockCode(p: var Parser): Node =
+  # Parse a block code `<pre>`
+  let tk = p.curr # tkBlockCode
+  result = Node(nt: ntBlockCode)
+  walk p
+  var lines: string
+  while p.curr isnot tk.kind and p.curr.pos == tk.pos:
+    var line: string
+    var lineno = p.curr.line
+    while true:
+      if p.curr is tkEOF: break
+      elif p.curr is tk.kind and p.curr.pos == tk.pos:
+        add lines, line
+        break
+      if p.curr.line == lineno:
+        add line, indent(p.curr.value, p.curr.wsno)
+        walk p
+      else:
+        add lines, line & "\n"
+        setLen(line, 0)
+        lineno = p.curr.line
+        add line, indent(p.curr.value, p.curr.wsno)
+        walk p
+    add result.blockCode, lines
   if p.curr is tk.kind:
     walk p
 
@@ -364,7 +445,7 @@ proc parseMedia(p: var Parser, isImage: bool): Node =
       walk p
     result.link = parseUri(address)
     result.linkNodes = innerNodes
-    result.indent = tk.wsno
+    result.wsno = tk.wsno
     result.isImage = isImage
     walk p # )
   else:
@@ -384,23 +465,20 @@ proc parseImage(p: var Parser): Node =
 proc parseBold(p: var Parser): Node =
   let tk = p.curr
   walk p
-  result = Node(nt: ntBold, indent: p.curr.wsno)
+  result = Node(nt: ntBold, wsno: tk.wsno)
   p.parseInline(tk, result.inlineNodes, tk.kind)
 
 proc parseItalic(p: var Parser): Node =
   let tk = p.curr
   walk p
-  result = Node(nt: ntItalic)
+  result = Node(nt: ntItalic, wsno: tk.wsno)
   p.parseInline(tk, result.inlineNodes, tk.kind)
 
 proc getRootPrefix(p: var Parser): Node =
   let callPrefixFn = 
     case p.curr.kind
-    of tkH1, tkH2, tkH3,
-       tkH4, tkH5, tkH6:
-      parseHeading
-    of tkUl, tkUlp:
-      parseUl
+    of tkH1, tkH2, tkH3, tkH4, tkH5, tkH6: parseHeading
+    of tkUl, tkUlp: parseUl
     of tkUlm:      
       if p.next.wsno == 0:
         parseItalic
@@ -414,19 +492,16 @@ proc getRootPrefix(p: var Parser): Node =
       if p.isAllowed(p.next):
         parseTag
       else: parseParagraph
-    of tkLB:
-      parseLink
-    of tkBold:
-      parseBold
-    of tkGT:
-      parseBlockquote
-    of tkExcl:
-      parseImage
+    of tkLB:    parseLink
+    of tkBold:  parseBold
+    of tkBlockCode: parseBlockCode
+    of tkGT:    parseBlockquote
+    of tkExcl:  parseImage
     else: parseParagraph
   
   let node = callPrefixFn(p)
   case node.nt
-  of ntUl, ntOl, ntHeading, ntParagraph:
+  of ntUl, ntOl, ntHeading, ntParagraph, ntBlockQuote, ntBlockCode:
     result = node
   else:
     result = Node(nt: ntParagraph, pNodes: @[node])
@@ -437,49 +512,9 @@ proc getPrefix(p: var Parser): Node =
     of tkLB:      parseLink
     of tkBold:    parseBold
     of tkUlm:     parseItalic
-    of tkTick: parseCode
+    of tkTick:    parseInlineCode
     else:         parseText
   callPrefixFn(p)
-
-#
-# Writers
-#
-proc writeInnerNode(node: Node): string # fwd declaration
-
-proc writeInnerNodes(nodes: seq[Node]): string =
-  for node in nodes:
-    add result, node.writeInnerNode()
-
-proc writeInnerNode(node: Node): string =
-  case node.nt
-  of ntLink:
-    let label = writeInnerNodes(node.linkNodes)
-    if unlikely(node.isImage):
-      if node.linkTitle.len > 0:
-        result = indent(img(src = $(node.link), alt=label, title=node.linkTitle), node.indent)
-      else:
-        result = indent(img(src = $(node.link), alt=label), node.indent)
-    else:
-      if node.linkTitle.len > 0:
-        result = indent(a(href = $(node.link), title=node.linkTitle, label), node.indent)
-      else:
-        result = indent(a(href = $(node.link), label), node.indent)
-  of ntText:
-    result = indent(node.text, node.indent)
-  of ntBold:
-    add result, indent(b(writeInnerNodes(node.inlineNodes)), node.indent)
-  of ntTag:
-    add result,
-      "<" & node.tagName & ">" & writeInnerNodes(node.tagInlineNodes) & "</" & node.tagName & ">"
-  of ntItalic:
-    add result, em(writeInnerNodes(node.inlineNodes))
-  of ntInner:
-    add result, writeInnerNodes(node.inner)
-  of ntCode:
-    add result, indent(code(node.text), node.indent)
-  of ntBr:
-    result = br()
-  else: discard
 
 #
 # Public API
@@ -494,82 +529,11 @@ proc newMarkdown*(content: string, minify = true, opts: MarkdownOptions = defaul
   while p.curr isnot tkEOF:
     if p.errors.status: break # catch the wet bandits!
     let node = p.getRootPrefix()
-    if likely(node != nil):
-      p.md.nodes.add(node)
+    p.md.nodes.add(node)
   if p.errors.status:
     let meta = "[" & $(p.errors.line) & ":" & $(p.errors.col) & "]"
-    raise newException(MarkdownException, meta & p.errors.msg.indent(1))
+    raise newException(MarkdownException, meta & indent(p.errors.msg, 1))
   result = p.md
   reset(p)
 
-proc toHtml*(md: Markdown): string =
-  ## Converts `Markdown` document to HTML
-  let len = md.nodes.len - 1
-  for n in 0 .. md.nodes.high:
-    var el: string
-    let nt = md.nodes[n].nt
-    case nt
-    of ntParagraph:
-      for pNode in md.nodes[n].pNodes:
-        case pNode.nt:
-        of ntLink:
-          if pNode.isImage:
-            add result, writeInnerNode(pNode)
-          else:
-            add result, p(writeInnerNode(pNode))
-        else:
-          add result, p(writeInnerNode(pNode))
-    of ntHeading:
-      for inner in md.nodes[n].headingNodes:
-        case inner.nt
-          of ntText:
-            add el, indent(inner.text, inner.indent)
-          else: discard
-      if md.opts.useAnchors:
-        el = el.strip
-        let slug = md.stackSelector("#", el, md.nodes[n])
-        el = a(id=slug, class="anchor", href="#" & slug) & el # todo `aria-hidden` is not recognized in htmlgen
-      add result,
-        case md.nodes[n].hlvl:
-        of tkH1: h1(el)
-        of tkH2: h2(el)
-        of tkH3: h3(el)
-        of tkH4: h4(el)
-        of tkH5: h5(el)
-        else: h6(el)
-    of ntUl, ntOl:
-      var lists: string
-      for node in md.nodes[n].list:
-        var el: string
-        for innerNode in node.inner:
-          add el, writeInnerNode(innerNode)
-        add lists, li(el.strip) & nl
-      if nt == ntUl:
-        add result, ul(nl, lists)
-      else:
-        add result, ol(nl, lists)
-    of ntBlockQuote:
-      var el: string
-      for node in md.nodes[n].inlineNodes:
-        add el, writeInnerNode(node)
-      add result, blockquote(el.strip)
-    of ntBr:
-      add result, br()
-    else: discard
-    setLen(el, 0)
-    if n < len: add result, nl
-  nl = "\n" # revert `\n`
-
-proc `$`*(md: Markdown): string = toHtml(md)
-
-proc toJson*(md: Markdown): string =
-  ## Parses `md` document and returns stringified `JSON`
-  discard 
-
-proc toJson*(md: Markdown, toJsonNode: bool): JsonNode =
-  ## Parses `md` document and returns `JsonNode`
-  discard
-
-proc toPdf*(md: Markdown, output: string, style = "") =
-  ## Compiles to `.pdf`. Optionally, you can provide some cool CSS to `style`
-  discard 
+include ./writers

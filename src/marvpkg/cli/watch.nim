@@ -4,14 +4,14 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import ../marv
+import ../parser
 import kapsis/[runtime, cli]
 import httpx, websocketx, watchout, nimwkhtmltox/pdf
 import std/[os, strutils, times, options, osproc,
         asyncdispatch, macros, httpcore, htmlgen]
 
 const
-  basePath = getProjectPath() / "marvdownpkg" / "commands"
+  basePath = getProjectPath() / "marvpkg" / "cli"
   htmlStyle = staticRead(basePath / "style.css")
   marvLogo = staticRead(basePath / "marv.png")
 proc getScreen(isPDF: bool, outputPath: string): string =
@@ -87,7 +87,7 @@ proc runServer*(input, output: string, delay: int) =
   proc watchoutCallback(file: watchout.File) {.closure.} =
     display("✨ Changes detected")
     display(file.getPath, indent = 2, br="after")
-    let broCommand = execCmdEx("./marvdown " & file.getPath & " " & output)
+    let broCommand = execCmdEx("./marv " & file.getPath & " " & output)
     echo broCommand.output
 
   startThread(watchoutCallback, @[input], delay, shouldJoinThread = false)

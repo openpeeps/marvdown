@@ -7,7 +7,7 @@
 when defined napibuild:
   # Build a native NAPI addon using Denim
   import pkg/denim
-  import ./marvdownpkg/marv
+  import ./marvpkg/parser
 
   init proc(module: Module) =
     proc toHtml(content: string, minify: bool) {.export_napi.} =
@@ -24,11 +24,11 @@ elif isMainModule:
   # Marvdown as a standalone CLI app. cuz its cool
   import pkg/kapsis
   import pkg/kapsis/db
-  import ./marvdownpkg/commands/cCommand
+  import ./marvpkg/cli/cCommand
   App:
     settings(database = dbMsgPacked, mainCmd = "c")
     about:
-      "This is Marv! A stupid simple Markdown parser"
+      "This is Marv! A stupid simple Markdown CL"
       "Made by Humans from OpenPeeps"
       "https://github.com/openpeeps/marvdown"
 
@@ -37,5 +37,5 @@ elif isMainModule:
         ? "Build to HTML, JSON or PDF. CSS Styling is optional"
 else:
   # Marvdown as a Nimble library <3
-  import ./marvdownpkg/marv
-  export marv
+  import ./marvpkg/parser
+  export parser

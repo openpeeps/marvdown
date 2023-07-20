@@ -1,7 +1,7 @@
 import std/[os, strutils, times, htmlgen]
 import kapsis/[runtime, cli]
 import nimwkhtmltox/pdf
-import ../marv, ./watch
+import ../parser, ./watch
 
 proc runCommand*(v: Values) =
   if not v.has("md"):
@@ -22,7 +22,12 @@ proc runCommand*(v: Values) =
       else: true
   let
     t = cpuTime()
-    md = newMarkdown(content, minify)
+    md = newMarkdown(content, minify,
+          MarkdownOptions(
+            allowHtmlAttributes: true,
+            useAnchors: true
+          )
+        )
   if toStdout:
     display(md.toHtml)
   else:

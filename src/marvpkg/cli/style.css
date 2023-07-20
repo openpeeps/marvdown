@@ -12,32 +12,48 @@ img {
   margin-bottom: 15px
 }
 
-p {
-  margin-bottom: 15px;
+p, ul, ol {
+  margin: 0 0 15px 0;
   line-height: 1.6em;
   padding: 0 20px
 }
 
-h1, ul, ol {
-  margin-bottom: 25px
+h1 {
+  margin-bottom: 25px;
+  font-size:2.7em
 }
 
-h1 {
-  font-size:2.7em
+h2 {
+  font-size: 2.4em;
+  margin-bottom: 15px;
 }
 
 h1, h2, h3, h4, h5, h6 {
   position: relative
 }
 
+*:not(pre) > code {
+  background: purple;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: .9em;
+}
+
+body.dark pre {
+  background:#161f20;
+  padding: 15px;
+  border-radius: 15px;
+} 
+
 body {
   font-size: 1.5em;
   font-family: "Inter V", Arial, sans-serif, serif;
   padding: 65px 0
+  background-color: whitesmoke;
 }
 
 body.dark {
-  background:#181718
+  background-color: #111718
 }
 
 body.dark * {
@@ -61,14 +77,6 @@ main .topbar {
   text-align: right;
   padding: 25px 0;
   width: 100%
-}
-
-main .topbar > div {
-  visibility: hidden;
-}
-
-main .topbar:hover > div {
-  visibility: visible;
 }
 
 main .topbar .btn-switch-theme {
