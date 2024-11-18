@@ -1,8 +1,10 @@
 --mm:arc
 --threads:on
+# --define:useMalloc
 # --define:toktokdebug
+--define:watchoutBrowserSync
 when defined release:
-  --define:danger
+  # --define:danger
   --opt:speed
   --passC:"-flto"
-  --checks:off
+  # --checks:off

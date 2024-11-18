@@ -7,9 +7,10 @@
   -ms-user-select: none
 }
 
-img {
+img, iframe {
   width: 100%;
-  margin-bottom: 15px
+  margin-bottom: 15px;
+  border-radius: 14px
 }
 
 p, ul, ol {
@@ -24,7 +25,7 @@ h1 {
 }
 
 h2 {
-  font-size: 2.4em;
+  font-size: 2.2em;
   margin-bottom: 15px;
 }
 
@@ -48,8 +49,8 @@ body.dark pre {
 body {
   font-size: 1.5em;
   font-family: "Inter V", Arial, sans-serif, serif;
-  padding: 65px 0
   background-color: whitesmoke;
+  padding: 65px 0
 }
 
 body.dark {
@@ -92,15 +93,14 @@ main .container {
   margin: 0 auto
 }
 
-main article img {
-  border-radius: 14px
-}
 main article .anchor {
   text-decoration: none;
   position:absolute;
   left: -40px;
   height: 100%;
   width: 40px;
+  vertical-align: middle;
+  display: ruby;
 }
 
 main article .anchor:before {
@@ -122,7 +122,7 @@ main article h6:hover .anchor:before {
 
 .marvdown-notifier {
   bottom: 20px;
-  left: 20px;
+  right: 20px;
   position: fixed
 }
 
