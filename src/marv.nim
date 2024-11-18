@@ -21,21 +21,14 @@ when defined napibuild:
       return %* toJSON(md)
 
 elif isMainModule:
-  # Marvdown as a standalone CLI app. cuz its cool
+  # Use Marvdown as standalone CLI application
   import pkg/kapsis
-  import pkg/kapsis/db
   import ./marvpkg/cli/cCommand
-  App:
-    settings(database = dbMsgPacked, mainCmd = "c")
-    about:
-      "This is Marv! A stupid simple Markdown CL"
-      "Made by Humans from OpenPeeps"
-      "https://github.com/openpeeps/marvdown"
 
-    commands:
-      $ "c" `md` `output` `css` ["min", "watch"]:
-        ? "Build to HTML, JSON or PDF. CSS Styling is optional"
+  commands:
+    compile path(`md`), ?path(`output`), ?string(`css`), bool(--min), bool(--watch):
+      ## Build to HTML, JSON or PDF. CSS Styling is optional
 else:
-  # Marvdown as a Nimble library <3
+  # Use Marvdown as Nimble library
   import ./marvpkg/parser
   export parser

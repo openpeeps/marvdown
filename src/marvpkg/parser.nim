@@ -1,6 +1,6 @@
 # Marvdown, a stupid simple Markdown parser
 #
-# (c) 2023 George Lemon | MIT License
+# (c) 2024 George Lemon | MIT License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 import pkg/toktok
@@ -8,6 +8,7 @@ import std/[os, tables, uri, htmlgen, unidecode, json]
 
 # from htmlparser import HtmlTag, BlockTags, InlineTags, SingleTags
 import htmlparser {.all.}
+export HtmlTag
 
 when not defined release:
   import std/[jsonutils]
@@ -20,17 +21,46 @@ const safe = {'<': "&lt;", '>': "&gt;"}.toTable()
 handlers:
   proc ltgt(lex: var Lexer, kind: TokenKind) =
     lexReady lex
-    add lex.token, safe[lex.buf[lex.bufpos]]
+    if lex.current == '<' and lex.next("!--"):
+      lex.kind = tkCommentBlock
+      inc lex.bufpos, 4
+      while true:
+        case lex.buf[lex.bufpos]
+        of '-':
+          if lex.next("->"):
+            inc lex.bufpos, 3
+            break
+          else:
+            add lex.token, lex.buf[lex.bufpos]
+            inc lex.bufpos
+        of EndOfFile: break
+        else:
+          add lex.token, lex.buf[lex.bufpos]
+          inc lex.bufpos
+      lex.token = lex.token.strip()
+    else:
+      add lex.token, safe[lex.buf[lex.bufpos]]
+      inc lex.bufpos
+      lex.kind = kind
+
+  proc handleUnknown*(lex: var Lexer) =
+    lexReady lex
+    # lex.startPos = lex.getColNumber(lex.bufpos)
+    add lex.token, lex.buf[lex.bufpos]
     inc lex.bufpos
-    lex.kind = kind
+    lex.kind = tkUnknown
 
 const settings =
   Settings(
     tkPrefix: "tk",
+    lexerName: "Lexer",
+    lexerTuple: "TokenTuple",
+    lexerTokenKind: "TokenKind",
     keepChar: true,
     keepUnknown: true,
+    handleUnknown: true,
     tkModifier: defaultTokenModifier,      
-    enableCustomIdent: false,
+    useDefaultIdent: true,
   )
 
 registerTokens settings:
@@ -59,6 +89,7 @@ registerTokens settings:
   backslash = '\\'
   excl = '!'
   paragraph
+  commentBlock
   h1 = '#': # todo toktok enable `keepChar` for variants
     h2 = '#'
     h3 = "##"
@@ -107,18 +138,20 @@ type
       inlineNodes: seq[Node]
     of ntTag:
       tagName: string
+      tagAttrs: string
       tagInlineNodes: seq[Node]
-      tagAttrs: seq[string]
     of ntBlockCode:
       blockCode: seq[string] # a seq of lines
     else: discard
     wsno: int
 
-  Markdown* = object
+  Slug* = string
+
+  Markdown* = ref object
     source: string
     nodes: seq[Node]
     opts: MarkdownOptions
-    selectors: TableRef[string, Node]
+    selectors: CountTableRef[Slug]
 
   TagType* = enum
     tagNone
@@ -130,16 +163,18 @@ type
   MarkdownOptions* = object
     allowed*: seq[HtmlTag]
       ## Allowed HTML tag names. See `defaultMarkdownOptions`
+      ## Marv is using `HtmlTag` from `std/htmlparser`
+      ## **Attention!** An empty `@[]` means all tags are allowed.
     allowTagsByType*: TagType
       ## Allow HTML tags by their types. Default `tagNone`
       ## This option is not used by default, instead, just a little
-      ## list of `HtmlTag`. See `allowed`
+      ## list of `HtmlTag`. See `allowed` sequence
     allowInlineStyle*: bool
       ## Allow CSS styling using `style` tag (disabled by default)
     allowHtmlAttributes*: bool
       ## Allow using html attributes, `width`, `title` and so on.
       ## For allowing use of `style` attribute, enable `allowInlineStyle`.
-    useAnchors*: bool
+    enableAnchors*: bool
       ## Enable anchor generation in title blocks (enabled by default)
 
   Parser* = object
@@ -164,7 +199,7 @@ let
       ],
       # todo add support for tagDetails, tagSummary (only in devel)
       # https://github.com/nim-lang/Nim/blob/devel/lib/pure/htmlparser.nim
-      useAnchors: true
+      enableAnchors: true
     )
 
 # fwd declaration
@@ -197,6 +232,17 @@ when not defined release:
   proc `$`(node: Node): string = pretty(node.toJson(), 2)
   # proc `$`(md: Markdown): string = pretty(md.toJson(), 2)
 
+proc indent(tk: TokenTuple, size: int): string =
+  add result, repeat(" ", size)
+  add result, tk.value 
+
+proc skipNextComment(p: var Parser) =
+  while true:
+    case p.next.kind
+    of tkCommentBlock:
+      p.next = p.lex.getToken() # skip inline comments
+    else: break
+
 proc walk(p: var Parser, offset = 1) =
   var i = 0
   while offset > i:
@@ -204,6 +250,7 @@ proc walk(p: var Parser, offset = 1) =
     p.prev = p.curr
     p.curr = p.next
     p.next = p.lex.getToken()
+    p.skipNextComment()
 
 template error(p: var Parser, msg: string, tk: TokenTuple, args: openarray[string] = []) =
   if args.len == 0:
@@ -224,11 +271,16 @@ proc `in`(tk: TokenTuple, kind: set[TokenKind]): bool {.inline.} =
 proc `notin`(tk: TokenTuple, kind: set[TokenKind]): bool {.inline.} =
   tk.kind notin kind
 
+proc skipComments(p: var Parser) =
+  while p.curr is tkCommentBlock:
+    walk p
+
 proc isSameLine(p: var Parser, left: TokenTuple): bool =
   result = p.curr.line == left.line and p.curr isnot tkEOF
 
-proc isSecondLine(p: var Parser, left: TokenTuple): bool =
-  result = (p.curr.line - left.line == 1) and p.curr isnot tkEOF
+proc isSecondLine(p: var Parser, lastLine: var int): bool =
+  result = (p.curr.line - lastLine == 1) and
+    p.curr notin {tkUl, tkUlp, tkUlm, tkH1, tkH2, tkH3, tkH4, tkH5, tkH6, tkEOF}
 
 proc isAllowed(p: var Parser, tk: TokenTuple): bool =
   if p.md.opts.allowed.len > 0:
@@ -248,25 +300,44 @@ proc slugify(input: string, lowercase = true, sep = "-"): string =
       result.add if lowercase: c.toLowerAscii else: c
     of Digits:
       result.add c
-    else:
-      discard
+    else: discard
 
 proc stackSelector(md: Markdown, prefix, name: string, node: Node): string =
   result = slugify(name)
-  if unlikely(md.selectors.hasKey(prefix & result)):
-    add result, "-" & $(md.selectors.len + 1)
-  md.selectors[prefix & result] = node
+  let idSelector = prefix & result
+  if unlikely(md.selectors.hasKey(idSelector)):
+    add result, "-" & $(md.selectors[idSelector])
+    inc(md.selectors, idSelector)
+  else:
+    md.selectors[idSelector] = 1
 
 #
 # parse handlers
 #
 proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
   while p.isSameLine(tk):
-    add parentNodes, p.getPrefix()
+    let prefixNode = p.getPrefix()
+    add parentNodes, prefixNode
 
-proc parseSecondLine(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node]) =
-  while p.isSecondLine(tk):
-    add parentNodes, p.getPrefix()
+proc parseSecondLine(p: var Parser; lastLine: var int; parentNodes: var seq[Node]) =
+  while true:
+    if p.isSecondLine(lastLine):
+      # if p.curr.wsno == 0:
+        # inc p.curr.wsno
+      if p.curr.wsno >= 2: # insert a break tag <br>
+        add parentNodes, Node(nt: ntBr)
+        dec p.curr.wsno, p.curr.wsno # wsno not needed 
+      add parentNodes, p.getPrefix()
+    else:
+      lastLine = p.prev.line
+      if p.isSecondLine(lastLine):
+        # if p.curr.wsno == 0:
+          # inc p.curr.wsno
+        if p.curr.wsno >= 2: # insert a break tag <br>
+          add parentNodes, Node(nt: ntBr)
+          dec p.curr.wsno, p.curr.wsno # wsno not needed 
+        add parentNodes, p.getPrefix()
+      else: break
 
 proc parseInline(p: var Parser, tk: TokenTuple, parentNodes: var seq[Node], xKind: TokenKind) =
   while p.isSameLine(tk) and p.curr isnot xKind:
@@ -279,21 +350,21 @@ proc parseHeading(p: var Parser): Node =
   let tk = p.curr
   walk p
   result = newHeading(tk.kind)
-  p.parseInline(tk, result.headingNodes)
+  while p.isSameLine(tk):
+    if unlikely(p.curr is tk.kind):
+      # headings can be `# Some title #` sucks, I know
+      walk p; break
+    add result.headingNodes, p.getPrefix()
 
 proc parseParagraph(p: var Parser): Node =
   # parse `paragraph` tags
   result = Node(nt: ntParagraph)
   let tk = p.curr
   var innerNode = Node(nt: ntInner)
+  var lastLine = p.curr.line
   p.parseInline(tk, innerNode.inner)
-  if p.isSecondLine(tk) and p.curr notin {tkUl, tkUlp, tkUlm}:
-    if p.curr.wsno == 0:
-      inc p.curr.wsno
-    elif p.curr.wsno >= 2: # insert a break tag <br>
-      add innerNode.inner, Node(nt: ntBr)
-      dec p.curr.wsno, p.curr.wsno # wsno not needed 
-    p.parseSecondLine(tk, innerNode.inner)
+  if p.isSecondLine(lastLine):
+    p.parseSecondLine(lastLine, innerNode.inner)
   add result.pNodes, innerNode
 
 proc parseBlockquote(p: var Parser): Node =
@@ -322,13 +393,23 @@ proc parseUl(p: var Parser): Node =
 proc parseOl(p: var Parser): Node =
   # parse ordered lists
   result = newOl()
+  var initPos = p.curr.wsno
   while (p.curr is tkInteger and p.next is tkDot) and p.next.wsno == 0:
-    walk p # tkInteger
-    var tk = p.prev
-    walk p # tkDot
-    let innerNode = Node(nt: ntInner)
-    p.parseList(tk, innerNode)
-    add result.list, innerNode
+    if p.curr.wsno > initPos:
+      while true:
+        if (p.curr is tkInteger and p.next is tkDot) and p.next.wsno == 0:
+          let x = p.parseOl()
+          if p.curr is tkUl:
+            add x.list[^1].inner, p.parseUl()
+          add result.list, x
+        else: break
+    else:
+      walk p # tkInteger
+      var tk = p.prev
+      walk p # tkDot
+      let innerNode = Node(nt: ntInner)
+      p.parseList(tk, innerNode)
+      add result.list, innerNode
 
 proc parseInnerTag(p: var Parser, parentNode: Node, tag: TokenTuple) =
   walk p # tkGT
@@ -363,9 +444,9 @@ proc parseTag(p: var Parser): Node =
         walk p
       else: walk p # could be an attr without values
       if likely(attrValue.len != 0):
-        add result.tagAttrs, attrName.value & "=" & "\"" & attrValue & "\""
+        add result.tagAttrs, " " & attrName.value & "=" & "\"" & attrValue & "\""
       else:
-        add result.tagAttrs, attrName.value
+        add result.tagAttrs, " " & attrName.value
     if likely(p.curr is tkGT):
       p.parseInnerTag(result, tag)
 
@@ -380,7 +461,7 @@ proc parseInlineCode(p: var Parser): Node =
   result = Node(nt: ntCode, wsno: p.curr.wsno)
   walk p
   while p.isSameLine(tk) and p.curr isnot tk.kind:
-    add result.text, indent(p.curr.value, p.curr.wsno)
+    add result.text, indent(p.curr, p.curr.wsno)
     walk p
   if p.curr is tk.kind:
     walk p
@@ -400,13 +481,13 @@ proc parseBlockCode(p: var Parser): Node =
         add lines, line
         break
       if p.curr.line == lineno:
-        add line, indent(p.curr.value, p.curr.wsno)
+        add line, indent(p.curr, p.curr.wsno)
         walk p
       else:
         add lines, line & "\n"
         setLen(line, 0)
         lineno = p.curr.line
-        add line, indent(p.curr.value, p.curr.wsno)
+        add line, indent(p.curr, p.curr.wsno)
         walk p
     add result.blockCode, lines
   if p.curr is tk.kind:
@@ -477,7 +558,8 @@ proc parseItalic(p: var Parser): Node =
 proc getRootPrefix(p: var Parser): Node =
   let callPrefixFn = 
     case p.curr.kind
-    of tkH1, tkH2, tkH3, tkH4, tkH5, tkH6: parseHeading
+    of tkH1, tkH2, tkH3,
+       tkH4, tkH5, tkH6: parseHeading
     of tkUl, tkUlp: parseUl
     of tkUlm:      
       if p.next.wsno == 0:
@@ -493,7 +575,7 @@ proc getRootPrefix(p: var Parser): Node =
         parseTag
       else: parseParagraph
     of tkLB:    parseLink
-    of tkBold:  parseBold
+    # of tkBold:  parseBold
     of tkBlockCode: parseBlockCode
     of tkGT:    parseBlockquote
     of tkExcl:  parseImage
@@ -514,18 +596,19 @@ proc getPrefix(p: var Parser): Node =
     of tkUlm:     parseItalic
     of tkTick:    parseInlineCode
     else:         parseText
-  callPrefixFn(p)
+  callPrefixFn(p) # faster than calling proc directly (weird)
 
 #
 # Public API
 #
 proc newMarkdown*(content: string, minify = true, opts: MarkdownOptions = defaultMarkdownOptions): Markdown =
   ## Create a new `Markdown` document from `content`
-  var p = Parser(lex: Lexer.init(content), md: Markdown(opts: opts))
+  var p = Parser(lex: newLexer(content), md: Markdown(opts: opts))
   p.curr = p.lex.getToken()
   p.next = p.lex.getToken()
-  p.md.selectors = newTable[string, Node]()
+  p.md.selectors = newCountTable[string]()
   if minify: nl = "" # remove `\n`
+  p.skipComments()
   while p.curr isnot tkEOF:
     if p.errors.status: break # catch the wet bandits!
     let node = p.getRootPrefix()

@@ -21,17 +21,19 @@ proc getScreen(isPDF: bool, outputPath: string): string =
     bodyElement = iframe(src="/preview.pdf")
   else:
     styleElement = style(`type`="text/css", htmlStyle)
+    var generatedCode = readFile(outputPath)
     bodyElement =
       main(
         `div`(class="topbar noselect", a(class="btn-switch-theme")),
         `div`(class="container",
-          article(readFile(outputPath))
+          article(generatedCode)
         )
       )
-    refreshNotifier = `div`(class="marvdown-notifier", style="display:none;",
+    refreshNotifier = `div`(class="marvdown-notifier",
       `div`(class="marvdown-spinner"),
       `div`(class="marvdown-logo")
     )
+    reset(generatedCode)
   result = 
     html(dir="ltr",
       head(
@@ -43,17 +45,27 @@ proc getScreen(isPDF: bool, outputPath: string): string =
       body(
         script("""
 document.body.insertAdjacentHTML('afterbegin', `$1`);
-let notifier = document.querySelector('.marvdown-notifier')
-const msocket = new WebSocket('ws://127.0.0.1:6710/ws');
-var lastTimeModified = localStorage.getItem('watchout') || 0
-msocket.addEventListener('message', (e) => {
-  if(parseInt(e.data) > lastTimeModified) {
-    notifier.style.display = 'block'
-    localStorage.setItem('watchout', e.data)
-    lastTimeModified = e.data
-    setTimeout(() => location.reload(), 320)
+{
+  let notifier = document.querySelector('.marvdown-notifier')
+  setTimeout(() => {notifier.style.display = 'none'}, 520)
+  function connectWatchoutServer() {      
+    const watchout = new WebSocket('ws://127.0.0.1:6711/ws');
+    watchout.addEventListener('message', (e) => {
+      if(e.data == '1') {
+        notifier.style.display = 'block'
+        setTimeout(() => location.reload(), 120)
+      }
+    });
+    watchout.addEventListener('close', () => {
+      setTimeout(() => {
+        console.log('Watchout WebSocket is closed. Try again...')
+        connectWatchoutServer()
+      }, 300)
+    })
   }
-})""" % [refreshNotifier]
+  connectWatchoutServer()
+}
+""" % [refreshNotifier]
         ),
         script("""
 const lightIcon = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>` 
@@ -84,14 +96,39 @@ document.addEventListener('DOMContentLoaded', function(){
     )
 
 proc runServer*(input, output: string, delay: int) =
-  proc watchoutCallback(file: watchout.File) {.closure.} =
+  let browserSyncDelay = 200
+  let browserSyncPort = Port(6711)
+  # Callback `onChange`
+  proc onChange(file: watchout.File) =
     display("✨ Changes detected")
     display(file.getPath, indent = 2, br="after")
-    let broCommand = execCmdEx("./marv " & file.getPath & " " & output)
-    echo broCommand.output
+    let invokeMarv = execCmdEx("./marv compile '" & file.getPath & "' " & output)
+    echo invokeMarv.output
 
-  startThread(watchoutCallback, @[input], delay, shouldJoinThread = false)
-  display("🪄 The Wet Bandits in Browser: http://localhost:6710", br="after")
+  # Callback `onFound`
+  proc onFound(file: watchout.File) =
+    discard
+
+  # Callback `onDelete`
+  proc onDelete(file: watchout.File) =
+    discard
+
+  let watcher =
+    newWatchout(
+      dirs = @[input],
+      onChange, onFound, onDelete,
+      recursive = true,
+      ext = @[".md"],
+      delay = browserSyncDelay,
+      browserSync =
+        WatchoutBrowserSync(
+          port: browserSyncPort,
+          delay: browserSyncDelay
+        )
+      )
+  # startThread(watchoutCallback, @[input], delay, shouldJoinThread = false)
+  display("🪄 Marvdown runs in browser: http://localhost:6710", br="after")
+  watcher.start()
 
   proc onRequest(req: Request) {.async.} =
     if req.httpMethod == some(HttpGet):
@@ -107,20 +144,20 @@ proc runServer*(input, output: string, delay: int) =
           req.send(Http404)
       of "/marv.png":
         req.send(Http200, marvLogo, headers = "content-type: image/png")
-      of "/ws":
-        try:
-          var ws = await newWebSocket(req)
-          await ws.send($toUnix(output.getLastModificationTime))
-          while ws.readyState == Open:
-            await ws.send($toUnix(output.getLastModificationTime))
-          ws.close()
-          reset(ws)
-        except WebSocketClosedError:
-          echo "Socket closed"
-        except WebSocketProtocolMismatchError:
-          echo "Socket tried to use an unknown protocol: ", getCurrentExceptionMsg()
-        except WebSocketError:
-          req.send(Http404)
+      # of "/ws":
+      #   try:
+      #     var ws = await newWebSocket(req)
+      #     await ws.send($toUnix(output.getLastModificationTime))
+      #     while ws.readyState == Open:
+      #       await ws.send($toUnix(output.getLastModificationTime))
+      #     ws.close()
+      #     reset(ws)
+      #   except WebSocketClosedError:
+      #     echo "Socket closed"
+      #   except WebSocketProtocolMismatchError:
+      #     echo "Socket tried to use an unknown protocol: ", getCurrentExceptionMsg()
+      #   except WebSocketError:
+      #     req.send(Http404)
       else:
         req.send(Http404)
 

@@ -8,36 +8,52 @@ proc writeInnerNodes(nodes: seq[Node]): string =
     add result, node.writeInnerNode()
 
 proc writeInnerNode(node: Node): string =
+  result = repeat(" ", node.wsno)
   case node.nt
+  of ntText:
+    add result, node.text
+  of ntBold:
+    add result, b(writeInnerNodes(node.inlineNodes))
   of ntLink:
     let label = writeInnerNodes(node.linkNodes)
     if unlikely(node.isImage):
       if node.linkTitle.len > 0:
-        result = indent(img(src = $(node.link), alt=label, title=node.linkTitle), node.wsno)
+        add result, img(src = $(node.link), alt=label, title=node.linkTitle)
       else:
-        result = indent(img(src = $(node.link), alt=label), node.wsno)
+        add result, img(src = $(node.link), alt=label)
     else:
       if node.linkTitle.len > 0:
-        result = indent(a(href = $(node.link), title=node.linkTitle, label), node.wsno)
+        add result, a(href = $(node.link), title=node.linkTitle, label)
       else:
-        result = indent(a(href = $(node.link), label), node.wsno)
-  of ntText:
-    result = indent(node.text, node.wsno)
-  of ntBold:
-    add result, indent(b(writeInnerNodes(node.inlineNodes)), node.wsno)
-  of ntTag:
-    let attrs = if node.tagAttrs.len > 0: indent(node.tagAttrs.join(" "), 1) else: "" 
+        add result, a(href = $(node.link), label)
+  of ntTag: 
     add result,
-      "<" & node.tagName & attrs & ">" & writeInnerNodes(node.tagInlineNodes) & "</" & node.tagName & ">"
+      "<" & node.tagName & node.tagAttrs & ">" & writeInnerNodes(node.tagInlineNodes) & "</" & node.tagName & ">"
   of ntItalic:
-    add result, indent(em(writeInnerNodes(node.inlineNodes)), node.wsno)
+    add result, em(writeInnerNodes(node.inlineNodes))
   of ntInner:
     add result, writeInnerNodes(node.inner)
   of ntCode:
-    add result, indent(code(node.text), node.wsno)
+    add result, code(node.text)
   of ntBr:
-    result = br()
+    add result, br()
   else: discard
+
+proc writeUnorderedOrderedLists(nt: NodeType, listNode: seq[Node]): string =
+  var lists: string
+  for node in listNode:
+    var el: string
+    for innerNode in node.inner:
+      case innerNode.nt
+      of ntOl, ntUl:
+        add el, writeUnorderedOrderedLists(innerNode.nt, innerNode.list)
+      else:
+        add el, writeInnerNode(innerNode)
+    add lists, li(el.strip) & nl
+  if nt == ntUl:
+    add result, ul(nl, lists)
+  else:
+    add result, ol(nl, lists)
 
 proc toHtml*(md: Markdown): string =
   ## Converts `Markdown` document to HTML
@@ -60,9 +76,10 @@ proc toHtml*(md: Markdown): string =
       for inner in md.nodes[n].headingNodes:
         case inner.nt
           of ntText:
-            add el, indent(inner.text, inner.wsno)
+            add el, repeat(" ", inner.wsno)
+            add el, inner.text
           else: discard
-      if md.opts.useAnchors:
+      if md.opts.enableAnchors:
         el = el.strip
         let slug = md.stackSelector("#", el, md.nodes[n])
         el = a(id=slug, class="anchor", href="#" & slug) & el # todo `aria-hidden` is not recognized in htmlgen
@@ -75,16 +92,7 @@ proc toHtml*(md: Markdown): string =
         of tkH5: h5(el)
         else: h6(el)
     of ntUl, ntOl:
-      var lists: string
-      for node in md.nodes[n].list:
-        var el: string
-        for innerNode in node.inner:
-          add el, writeInnerNode(innerNode)
-        add lists, li(el.strip) & nl
-      if nt == ntUl:
-        add result, ul(nl, lists)
-      else:
-        add result, ol(nl, lists)
+      add result, writeUnorderedOrderedLists(nt, md.nodes[n].list)
     of ntBlockCode:
       var strCode: string
       for line in md.nodes[n].blockCode:
