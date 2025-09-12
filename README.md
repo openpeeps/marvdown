@@ -35,10 +35,31 @@ Install Marvdown via [Nimble](https://nim-lang.org/docs/nimble.html)
 nimble install marvdown
 ```
 
-A GitHub action will build the binary CLI app every time a new release is made. Download the latest binary from the [releases page](https://github.com/openpeeps/marvdown/releases).
+For Node.js install Marvdown via [npm](https://www.npmjs.com/package/@openpeeps/marvdown)
+
+A GitHub action will build the binary CLI app and Node.js addon evertime a new release is published. Download the latest version of Marvdown from the [Github releases page](https://github.com/openpeeps/marvdown/releases).
 
 ## Example Usage
-todo
+
+In Nim language the fastest way to convert markdown to HTML is to use the `toHtml()` proc.
+```nim
+import marvdown
+
+echo marvdown.toHtml(readFile("sample.md"))
+```
+
+In JavaScript or TypeScript you can load the N-API addon and use the `toHtml()` function.
+```js
+const fs = require('fs');
+const marvdown = require('@openpeeps/marvdown')
+
+let output = marvdown.toHtml(fs.readFileSync('sample.md', 'utf8'))
+console.log(output)
+```
+
+_todo: example of custom options_
+
+For more examples, see the [/examples folder](#). Also check out the [API reference](https://openpeeps.github.io/marvdown/) for more details 👌
 
 ### Benchmarks
 todo

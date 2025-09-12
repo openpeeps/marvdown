@@ -10,15 +10,10 @@ when defined napibuild:
   import ./marvdown/parser
 
   init proc(module: Module) =
-    proc toHtml(content: string, minify: bool) {.export_napi.} =
-      ## Parse markdown contents to HTML
-      var md = newMarkdown(args.get("content").getStr, args.get("minify").getBool)
+    proc toHtml(content: string) {.export_napi.} =
+      ## Convert Markdown content to HTML
+      var md = newMarkdown(args.get("content").getStr)
       return %* toHtml(md)
-
-    proc md2json(content: string, minify: bool) {.export_napi.} =
-      ## Parse markdown contents to JSON
-      var md = newMarkdown(args.get("content").getStr, args.get("minify").getBool)
-      return %* toJSON(md)
 
 elif isMainModule:
   # Use Marvdown as standalone CLI application
@@ -90,3 +85,9 @@ else:
   # Use Marvdown as Nimble library
   import ./marvdown/[parser, ast, renderer]
   export parser, ast, renderer
+
+  proc toHtml*(content: sink string): owned string =
+    ## Convert Markdown content to HTML
+    var md = newMarkdown(content)
+    md.toHtml()
+

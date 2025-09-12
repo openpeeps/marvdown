@@ -259,6 +259,25 @@ proc parseList(md: var Markdown): MarkdownNode =
     let itemNode = md.parseListItem()
     result.children.items.add(itemNode)
 
+proc parseBlockquote(md: var Markdown): MarkdownNode =
+  ## Parse one or more consecutive blockquote tokens into a blockquote node
+  let startIndent = md.parser.curr.wsno
+  result = MarkdownNode(
+    kind: mdkBlockquote,
+    children: MarkdownNodeList(items: @[])
+  )
+  while md.parser.curr.kind == mtkBlockquote and md.parser.curr.wsno == startIndent:
+    let quoteText = md.parser.curr.token.strip()
+    # Parse inline content of the blockquote
+    for n in md.parseInline(quoteText):
+      result.children.items.add(n)
+    md.advance()
+    # Handle nested blockquotes ("> > ...")
+    if md.parser.curr.kind == mtkBlockquote and md.parser.curr.wsno > startIndent:
+      let nested = md.parseBlockquote()
+      result.children.items.add(nested)
+
+
 #
 # Init Marvdown with content and options
 #
@@ -267,6 +286,12 @@ template withCurrentParagraph(body: untyped): untyped =
   if currentParagraph.isNil:
     currentParagraph = MarkdownNode(kind: mdkParagraph, children: MarkdownNodeList())
   body
+
+template closeCurrentParagraph(): untyped =
+  # Close and add the current paragraph to the AST if it exists
+  if not currentParagraph.isNil:
+    md.ast.add(currentParagraph)
+    currentParagraph = nil
 
 const blockLevelTags = {
   HtmlTag.tagDiv, HtmlTag.tagP, HtmlTag.tagH1, HtmlTag.tagH2,
@@ -311,16 +336,12 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
       currentParagraph.children.items.add(textNode)
       md.advance()
     of mtkImage:
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       let imgNode = md.parseImage()
       md.ast.add(imgNode)
       md.advance()
     of mtkLink:
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       let linkNode = md.parseLink()
       md.ast.add(linkNode)
       md.advance()
@@ -335,9 +356,7 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         let node = md.parseEmphasis()
         currentParagraph.children.items.add(node)
     of mtkHeading:
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       let text = curr.token.strip()
       let headingNode = MarkdownNode(
         kind: mdkHeading,
@@ -382,16 +401,12 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         md.ast.add(htmlNode)
         md.advance()
     of mtkListItem, mtkOListItem:
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       md.ast.add(md.parseList())
       # do not advance here, parseList already advances
     of mtkCodeBlock:
       # handle code blocks
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       let lang = if curr.attrs.isSome and curr.attrs.get().len > 0: curr.attrs.get()[0] else: ""
       let codeNode = MarkdownNode(kind: mdkCodeBlock, code: curr.token, codeLang: lang)
       md.ast.add(codeNode)
@@ -401,10 +416,12 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         let codeNode = MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token)
         currentParagraph.children.items.add(codeNode)
       md.advance()
+    of mtkBlockquote:
+      closeCurrentParagraph()
+      let bqNode = md.parseBlockquote()
+      md.ast.add(bqNode)
     else:
-      if not currentParagraph.isNil:
-        md.ast.add(currentParagraph)
-        currentParagraph = nil
+      closeCurrentParagraph()
       md.advance()
   if not currentParagraph.isNil:
     md.ast.add(currentParagraph)

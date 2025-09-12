@@ -93,5 +93,10 @@ proc renderNode*(node: MarkdownNode): string =
         ("\"", "&quot;"), ("&", "&amp;")
       )
     result = "<code>" & inlineCode & "</code>"
+  of mdkBlockquote:
+    var bqContent = ""
+    for child in node.children.items:
+      bqContent.add(renderNode(child))
+    result = "<blockquote>" & bqContent & "</blockquote>"
   else:
     discard

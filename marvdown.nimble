@@ -16,4 +16,5 @@ requires "kapsis"
 requires "denim"
 requires "jsony"
 
-import os, strutils
+task napi, "Build Marvdown as a Node.js addon using N-API":
+  exec "denim build src/marvdown.nim --cmake -y"
