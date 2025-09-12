@@ -25,6 +25,8 @@ jobs:
         with:
           nim-version: ${{ matrix.nim-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install PCRE dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpcre3 libpcre3-dev
       - run: nimble install -Y
       - run: nim c -r src/${{ github.event.repository.name }}.nim
       - run: nimble test
