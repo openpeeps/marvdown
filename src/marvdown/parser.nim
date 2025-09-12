@@ -84,7 +84,7 @@ proc parseImage(md: var Markdown): MarkdownNode =
     let alt = attrs[0]
     let src = attrs[1]
     let title = if attrs.len > 2: attrs[2] else: ""
-    result = MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title, children: nil)
+    result = MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title)
 
 proc parseLink(md: var Markdown): MarkdownNode =
   # Parse a link token into a MarkdownNode
@@ -98,7 +98,7 @@ proc parseLink(md: var Markdown): MarkdownNode =
 
 proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
-  result = MarkdownNode(kind: mdkText, text: md.parser.curr.token, children: nil)
+  result = MarkdownNode(kind: mdkText, text: md.parser.curr.token)
 
 proc parseStrong(md: var Markdown): MarkdownNode =
   # Parse strong text and add to current paragraph
@@ -147,7 +147,7 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
     if curr.line != ln: break
     case curr.kind
     of mtkText:
-      result.add(MarkdownNode(kind: mdkText, text: curr.token, children: nil))
+      result.add(MarkdownNode(kind: mdkText, text: curr.token))
       curr = lex.nextToken()
     of mtkEmphasis:
       let startCol = curr.col
@@ -155,15 +155,17 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
       if next.kind == mtkText:
         let after = lex.nextToken()
         if after.kind == mtkEmphasis:
-          result.add(MarkdownNode(kind: mdkEmphasis, children: MarkdownNodeList(items: @[MarkdownNode(kind: mdkText, text: next.token, children: nil)])))
+          result.add(MarkdownNode(kind: mdkEmphasis,
+              children: MarkdownNodeList(items: @[MarkdownNode(kind: mdkText, text: next.token)]))
+          )
           curr = lex.nextToken()
           continue
         else:
-          result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len], children: nil))
+          result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len]))
           curr = after
           continue
       else:
-        result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len], children: nil))
+        result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len]))
         curr = next
         continue
     of mtkLink:
@@ -172,7 +174,7 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         let textVal = curr.attrs.get()[0]
         let hrefVal = curr.attrs.get()[1]
         let titleVal = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
-        let textNode = MarkdownNode(kind: mdkText, text: textVal, children: nil)
+        let textNode = MarkdownNode(kind: mdkText, text: textVal)
         result.add(MarkdownNode(kind: mdkLink, linkHref: hrefVal, linkTitle: titleVal, children: MarkdownNodeList(items: @[textNode])))
       curr = lex.nextToken()
     of mtkImage:
@@ -181,7 +183,7 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         let alt = curr.attrs.get()[0]
         let src = curr.attrs.get()[1]
         let title = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
-        result.add(MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title, children: nil))
+        result.add(MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title))
       curr = lex.nextToken()
     of mtkInlineCode:
       result.add(MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token))
@@ -192,23 +194,23 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
       while curr.kind != mtkStrong and curr.kind != mtkEOF:
         case curr.kind
         of mtkText:
-          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token, children: nil))
+          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
         of mtkEmphasis:
           var emphChildren: seq[MarkdownNode] = @[]
           curr = lex.nextToken()
           while curr.kind != mtkEmphasis and curr.kind != mtkStrong and curr.kind != mtkEOF:
             if curr.kind == mtkText:
-              emphChildren.add(MarkdownNode(kind: mdkText, text: curr.token, children: nil))
+              emphChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
             curr = lex.nextToken()
           strongChildren.add(MarkdownNode(kind: mdkEmphasis, children: MarkdownNodeList(items: emphChildren)))
         else:
-          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token, children: nil))
+          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
         curr = lex.nextToken()
       result.add(MarkdownNode(kind: mdkStrong, children: MarkdownNodeList(items: strongChildren)))
       if curr.kind == mtkStrong:
         curr = lex.nextToken()
     else:
-      result.add(MarkdownNode(kind: mdkText, text: curr.token, children: nil))
+      result.add(MarkdownNode(kind: mdkText, text: curr.token))
       curr = lex.nextToken()
 
 proc parseListItem(md: var Markdown): MarkdownNode =
@@ -244,12 +246,16 @@ proc parseListItem(md: var Markdown): MarkdownNode =
 proc parseList(md: var Markdown): MarkdownNode =
   # Parse a sequence of list items into a single list node
   let startIndent = md.parser.curr.wsno
+  let isOrdered = md.parser.curr.kind == mtkOListItem
   result = MarkdownNode(
     kind: mdkList,
-    listOrdered: md.parser.curr.kind == mtkOListItem,
+    listOrdered: isOrdered,
     children: MarkdownNodeList(items: @[])
   )
   while md.parser.curr.kind in {mtkListItem, mtkOListItem} and md.parser.curr.wsno == startIndent:
+    # If the list type changes, break and let the main parser handle the new list
+    if (md.parser.curr.kind == mtkOListItem) != isOrdered:
+      break
     let itemNode = md.parseListItem()
     result.children.items.add(itemNode)
 
@@ -387,12 +393,12 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         md.ast.add(currentParagraph)
         currentParagraph = nil
       let lang = if curr.attrs.isSome and curr.attrs.get().len > 0: curr.attrs.get()[0] else: ""
-      let codeNode = MarkdownNode(kind: mdkCodeBlock, code: curr.token, codeLang: lang, children: nil)
+      let codeNode = MarkdownNode(kind: mdkCodeBlock, code: curr.token, codeLang: lang)
       md.ast.add(codeNode)
       md.advance()
     of mtkInlineCode:
       withCurrentParagraph do:
-        let codeNode = MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token, children: nil)
+        let codeNode = MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token)
         currentParagraph.children.items.add(codeNode)
       md.advance()
     else:
