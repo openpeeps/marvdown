@@ -1,7 +1,19 @@
 <p align="center">
-    <img src="https://raw.githubusercontent.com/openpeeps/marvdown/main/.github/marvdown-logo.png" width="256px"><br>
+    <img src="https://raw.githubusercontent.com/openpeeps/marvdown/main/.github/marvdown-logo.png" width="128px"><br>
     This is Marvdown ⚡️ A stupid simple Markdown parser
 </p>
+
+<p align="center">
+  <code>nimble install marvdown</code> / <code>npm install @openpeeps/marvdown</code>
+</p>
+
+<p align="center">
+  <a href="https://openpeeps.github.io/marvdown/">API reference</a> | <a href="https://github.com/openpeeps/marvdown/releases">Download</a><br><br>
+  <img src="https://github.com/openpeeps/marvdown/workflows/test/badge.svg" alt="Github Actions"> <img src="https://github.com/openpeeps/marvdown/workflows/docs/badge.svg" alt="Github Actions">
+</p>
+
+> [!NOTE]  
+> Marv is still in early development. More features and improvements are coming soon.
 
 ## 😍 Key Features
 - [x] Extremely Fast & Lightweight
@@ -15,7 +27,6 @@
 
 ## About
 Marv is a stupid simple markdown parser written in [Nim](https://nim-lang.org). It can be used as a library in your Nim projects or as a CLI tool to convert markdown files to HTML. Currently, it supports basic markdown syntax like headings, paragraphs, bold, italic, links, images, lists, blockquotes, code blocks and inline code.
-
 
 ## Installing
 
