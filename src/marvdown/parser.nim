@@ -269,12 +269,23 @@ const blockLevelTags = {
   HtmlTag.tagUl, HtmlTag.tagOl, HtmlTag.tagLi, HtmlTag.tagHr
 }
 
-proc newMarkdown*(content: sink string, minify = true,
-            opts: MarkdownOptions): Markdown =
-  ## Create a new Markdown parser instance
+let defaultOptions = MarkdownOptions(
+  allowed: @[
+    tagA, tagAbbr, tagB, tagBlockquote, tagBr,
+    tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
+    tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
+    tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl
+  ],
+  allowTagsByType: tagNone,
+  allowInlineStyle: false,
+  allowHtmlAttributes: false,
+  enableAnchors: true
+)
+
+proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions): Markdown =
+  ## Create a new Markdown instance
   var md = Markdown(
     parser: MarkdownParser(lexer: initLexer(content)),
-    minify: minify,
     opts: opts,
     selectors: newCountTable[HeadlineAnchor]()
   )
