@@ -51,7 +51,7 @@ elif isMainModule:
         enableAnchors: v.has("--optAnchors")
       )
       t = cpuTime() # start timer after reading file
-      md = newMarkdown(content, false, markdownOptions)
+      md = newMarkdown(content, markdownOptions)
 
     var outputPath =
       if hasOutputPath:
