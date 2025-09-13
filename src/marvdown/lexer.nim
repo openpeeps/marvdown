@@ -63,7 +63,7 @@ proc advance(lex: var MarkdownLexer) =
   if lex.pos < lex.input.len:
     if lex.current == '\n':
       inc lex.line
-      lex.col = 1
+      lex.col = 0
     else:
       inc lex.col
     inc lex.pos
@@ -85,7 +85,7 @@ proc initToken(lex: var MarkdownLexer, kind: MarkdownTokenKind, value: sink stri
   (kind, value, lex.line, lex.pos, lex.col, wsno, none(seq[string]))
 
 proc newTokenTuple(lex: MarkdownLexer, kind: MarkdownTokenKind, token: string = "", wsno: int = 0, attrs: Option[seq[string]] = none(seq[string])): MarkdownTokenTuple =
-  (kind, token, lex.line, lex.col, lex.pos, wsno, attrs)
+  (kind, token, lex.line, lex.col - token.len, lex.pos, wsno, attrs)
 
 proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   ## Lex the next token from the input
@@ -96,7 +96,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       inc wsno
       lex.advance()
     if lex.current == '\n':
-      inc lex.line
+      # inc lex.line
       lex.col = 0
       lex.advance()
       wsno = 0
@@ -114,6 +114,8 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   if lex.current == '\0':
     return newTokenTuple(lex, mtkEOF, wsno=wsno)
 
+  # let startCol = wsno # not needed anymore
+
   case lex.current
   of '#':
     # Headings (e.g., ## Heading 2)
@@ -127,9 +129,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      return newTokenTuple(lex, mtkHeading, lex.strbuf.strip(), wsno, some(@[$level]))
+      return newTokenTuple(lex, mtkHeading, lex.strbuf.strip(), wsno=wsno, attrs=some(@[$level]))
     else:
-      return newTokenTuple(lex, mtkText, repeat('#', level), wsno)
+      return newTokenTuple(lex, mtkText, repeat('#', level), wsno=wsno)
   of '-', #['*',]# '_':
     # Horizontal rule or unordered list or emphasis/strong
     let ch = lex.current
@@ -139,14 +141,14 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
     if count >= 3 and (lex.current == '\n' or lex.current == '\0'):
       # it's a horizontal rule!
-      return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count), wsno)
+      return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count), wsno=wsno)
     elif (ch in {'-', '*', '+'}) and (lex.current == ' ' or lex.current == '\t'):
       lex.advance()
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      return newTokenTuple(lex, mtkListItem, lex.strbuf.strip(), wsno)
+      return newTokenTuple(lex, mtkListItem, lex.strbuf.strip(), wsno=wsno)
     elif ch in {'*', '_'}:
       # Emphasis or strong
       if lex.peek() == ch:
@@ -155,7 +157,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       else:
         return newTokenTuple(lex, mtkEmphasis, wsno=wsno)
     else:
-      return newTokenTuple(lex, mtkText, repeat(ch, count), wsno)
+      return newTokenTuple(lex, mtkText, repeat(ch, count), wsno=wsno)
   of '>':
     # Blockquote
     lex.advance()
@@ -165,7 +167,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     while lex.current notin {'\n', '\r', '\0'}:
       lex.strbuf.add(lex.current)
       lex.advance()
-    return newTokenTuple(lex, mtkBlockquote, lex.strbuf.strip(), wsno)
+    return newTokenTuple(lex, mtkBlockquote, lex.strbuf.strip(), wsno=wsno)
   of '0'..'9':
     # Ordered list item
     lex.strbuf.setLen(0)
@@ -181,9 +183,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      return newTokenTuple(lex, mtkOListItem, lex.strbuf.strip(), wsno)
+      return newTokenTuple(lex, mtkOListItem, lex.strbuf.strip(), wsno=wsno)
     else:
-      return newTokenTuple(lex, mtkText, lex.strbuf, wsno)
+      return newTokenTuple(lex, mtkText, lex.strbuf, wsno=wsno)
   of '`', '~':
     # Fenced code block (``` or ~~~)
     if lex.peek() == lex.current and lex.peek(2) == lex.current:
@@ -206,7 +208,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         lex.advance(); lex.advance(); lex.advance()
       if lex.current in {'\n', '\r'}:
         lex.advance()
-      return newTokenTuple(lex, mtkCodeBlock, lex.strbuf, wsno, some(@[lang]))
+      return newTokenTuple(lex, mtkCodeBlock, lex.strbuf, wsno=wsno, attrs=some(@[lang]))
     elif lex.current == '`':
       # Inline code
       lex.advance()
@@ -216,13 +218,13 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         lex.advance()
       if lex.current == '`':
         lex.advance()
-      return newTokenTuple(lex, mtkInlineCode, lex.strbuf, wsno)
+      return newTokenTuple(lex, mtkInlineCode, lex.strbuf, wsno=wsno)
     else:
       # treat as text
       lex.strbuf.setLen(0)
       lex.strbuf.add(lex.current)
       lex.advance()
-      return newTokenTuple(lex, mtkText, lex.strbuf, wsno)
+      return newTokenTuple(lex, mtkText, lex.strbuf, wsno=wsno)
   of '!':
     # Image
     if lex.peek() == '[':
@@ -247,7 +249,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     else:
       var text = "!"
       lex.advance()
-      return newTokenTuple(lex, mtkText, text, wsno)
+      return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '[':
     # Link
     lex.advance()
@@ -268,7 +270,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         if lex.current == ')':
           lex.advance()
         return newTokenTuple(lex, mtkLink, wsno=wsno, attrs=some(@[text, href]))
-    return newTokenTuple(lex, mtkText, text, wsno)
+    return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '*':
     # Emphasis or strong
     if lex.peek() == '*':
@@ -286,7 +288,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     else:
       var text = " "
       lex.advance()
-      return newTokenTuple(lex, mtkText, text, wsno)
+      return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '<':
     # Raw HTML
     lex.strbuf.setLen(0)
@@ -307,14 +309,14 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     if lex.current == '>':
       lex.strbuf.add(lex.current)
       lex.advance()
-    return newTokenTuple(lex, mtkHtml, lex.strbuf, wsno, some(@[tag]))
+    return newTokenTuple(lex, mtkHtml, lex.strbuf, wsno=wsno, attrs=some(@[tag]))
   of '|':
     # Table row
     lex.strbuf.setLen(0)
     while lex.current notin {'\n', '\r', '\0'}:
       lex.strbuf.add(lex.current)
       lex.advance()
-    return newTokenTuple(lex, mtkTable, lex.strbuf, wsno)
+    return newTokenTuple(lex, mtkTable, lex.strbuf, wsno=wsno)
   else:
     # Paragraph or plain text
     lex.strbuf.setLen(0)
@@ -323,5 +325,5 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.strbuf.add(lex.current)
       lex.advance()
     if lex.strbuf.len > 0:
-      return newTokenTuple(lex, mtkText, lex.strbuf, wsno)
+      return newTokenTuple(lex, mtkText, lex.strbuf, wsno=wsno)
     return newTokenTuple(lex, mtkUnknown, wsno=wsno)

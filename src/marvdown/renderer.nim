@@ -14,7 +14,7 @@ proc renderNode*(node: MarkdownNode): string =
   ## Render a single MarkdownNode to HTML. This proc is called recursively for child nodes.
   case node.kind
   of mdkText:
-    result = node.text
+    result = indent(node.text, node.wsno)
   of mdkStrong:
     var content = ""
     for child in node.children.items:

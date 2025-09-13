@@ -84,7 +84,14 @@ proc parseImage(md: var Markdown): MarkdownNode =
     let alt = attrs[0]
     let src = attrs[1]
     let title = if attrs.len > 2: attrs[2] else: ""
-    result = MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title)
+    result = MarkdownNode(
+      kind: mdkImage,
+      imageAlt: alt,
+      imageSrc: src,
+      imageTitle: title,
+      line: md.parser.curr.line,
+      wsno: md.parser.curr.wsno
+    )
 
 proc parseLink(md: var Markdown): MarkdownNode =
   # Parse a link token into a MarkdownNode
@@ -93,12 +100,29 @@ proc parseLink(md: var Markdown): MarkdownNode =
     let text = attrs[0]
     let href = attrs[1]
     let title = if attrs.len > 2: attrs[2] else: ""
-    let textNode = MarkdownNode(kind: mdkText, text: text)
-    result = MarkdownNode(kind: mdkLink, linkHref: href, linkTitle: title, children: MarkdownNodeList(items: @[textNode]))
+    let textNode = MarkdownNode(
+      kind: mdkText,
+      text: text,
+      line: md.parser.curr.line,
+      wsno: md.parser.curr.wsno
+    )
+    result = MarkdownNode(
+      kind: mdkLink,
+      linkHref: href,
+      linkTitle: title,
+      children: MarkdownNodeList(items: @[textNode]),
+      line: md.parser.curr.line,
+      wsno: md.parser.curr.wsno
+    )
 
 proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
-  result = MarkdownNode(kind: mdkText, text: md.parser.curr.token)
+  result = MarkdownNode(
+    kind: mdkText,
+    text: md.parser.curr.token,
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  )
 
 proc parseStrong(md: var Markdown): MarkdownNode =
   # Parse strong text and add to current paragraph
@@ -110,7 +134,12 @@ proc parseStrong(md: var Markdown): MarkdownNode =
       strongChildren.add(md.parseText())
     of mtkEmphasis:
       # Recursively parse emphasis inside strong
-      var emphNode = MarkdownNode(kind: mdkEmphasis, children: MarkdownNodeList())
+      var emphNode = MarkdownNode(
+        kind: mdkEmphasis,
+        children: MarkdownNodeList(),
+        line: md.parser.curr.line,
+        wsno: md.parser.curr.wsno
+      )
       md.advance()
       var emphChildren = newSeq[MarkdownNode]()
       while md.parser.curr.kind notin {mtkEmphasis, mtkStrong, mtkEOF}:
@@ -123,14 +152,24 @@ proc parseStrong(md: var Markdown): MarkdownNode =
       strongChildren.add(emphNode)
     else: break
     md.advance()
-  result = MarkdownNode(kind: mdkStrong, children: MarkdownNodeList(items: strongChildren))
+  result = MarkdownNode(
+    kind: mdkStrong,
+    children: MarkdownNodeList(items: strongChildren),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  )
   if md.parser.curr.kind == mtkStrong:
     md.advance() # Skip closing strong
 
 proc parseEmphasis(md: var Markdown): MarkdownNode =
   # Parse emphasis text and add to current paragraph
   md.advance() # Skip opening emphasis
-  result = MarkdownNode(kind: mdkEmphasis, children: MarkdownNodeList())
+  result = MarkdownNode(
+    kind: mdkEmphasis,
+    children: MarkdownNodeList(),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  )
   while md.parser.curr.kind notin {mtkEmphasis, mtkEOF}:
     if md.parser.curr.kind == mtkText:
       result.children.items.add(md.parseText())
@@ -147,7 +186,12 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
     if curr.line != ln: break
     case curr.kind
     of mtkText:
-      result.add(MarkdownNode(kind: mdkText, text: curr.token))
+      result.add(MarkdownNode(
+        kind: mdkText,
+        text: curr.token,
+        line: curr.line,
+        wsno: curr.wsno
+      ))
       curr = lex.nextToken()
     of mtkEmphasis:
       let startCol = curr.col
@@ -155,17 +199,35 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
       if next.kind == mtkText:
         let after = lex.nextToken()
         if after.kind == mtkEmphasis:
-          result.add(MarkdownNode(kind: mdkEmphasis,
-              children: MarkdownNodeList(items: @[MarkdownNode(kind: mdkText, text: next.token)]))
-          )
+          result.add(MarkdownNode(
+            kind: mdkEmphasis,
+            children: MarkdownNodeList(items: @[MarkdownNode(
+              kind: mdkText,
+              text: next.token,
+              line: next.line,
+              wsno: next.wsno
+            )]),
+            line: curr.line,
+            wsno: curr.wsno
+          ))
           curr = lex.nextToken()
           continue
         else:
-          result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len]))
+          result.add(MarkdownNode(
+            kind: mdkText,
+            text: text[startCol-1 ..< text.len],
+            line: curr.line,
+            wsno: curr.wsno
+          ))
           curr = after
           continue
       else:
-        result.add(MarkdownNode(kind: mdkText, text: text[startCol-1 ..< text.len]))
+        result.add(MarkdownNode(
+          kind: mdkText,
+          text: text[startCol-1 ..< text.len],
+          line: curr.line,
+          wsno: curr.wsno
+        ))
         curr = next
         continue
     of mtkLink:
@@ -174,8 +236,20 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         let textVal = curr.attrs.get()[0]
         let hrefVal = curr.attrs.get()[1]
         let titleVal = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
-        let textNode = MarkdownNode(kind: mdkText, text: textVal)
-        result.add(MarkdownNode(kind: mdkLink, linkHref: hrefVal, linkTitle: titleVal, children: MarkdownNodeList(items: @[textNode])))
+        let textNode = MarkdownNode(
+          kind: mdkText,
+          text: textVal,
+          line: curr.line,
+          wsno: curr.wsno
+        )
+        result.add(MarkdownNode(
+          kind: mdkLink,
+          linkHref: hrefVal,
+          linkTitle: titleVal,
+          children: MarkdownNodeList(items: @[textNode]),
+          line: curr.line,
+          wsno: curr.wsno
+        ))
       curr = lex.nextToken()
     of mtkImage:
       # Parse image inline
@@ -183,34 +257,80 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         let alt = curr.attrs.get()[0]
         let src = curr.attrs.get()[1]
         let title = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
-        result.add(MarkdownNode(kind: mdkImage, imageAlt: alt, imageSrc: src, imageTitle: title))
+        result.add(MarkdownNode(
+          kind: mdkImage,
+          imageAlt: alt,
+          imageSrc: src,
+          imageTitle: title,
+          line: curr.line,
+          wsno: curr.wsno
+        ))
       curr = lex.nextToken()
     of mtkInlineCode:
-      result.add(MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token))
+      result.add(MarkdownNode(
+        kind: mdkInlineCode,
+        inlineCode: curr.token,
+        line: curr.line,
+        wsno: curr.wsno
+      ))
       curr = lex.nextToken()
     of mtkStrong:
       var strongChildren: seq[MarkdownNode] = @[]
+      let strongLine = curr.line
+      let strongWsno = curr.wsno
       curr = lex.nextToken()
       while curr.kind != mtkStrong and curr.kind != mtkEOF:
         case curr.kind
         of mtkText:
-          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
+          strongChildren.add(MarkdownNode(
+            kind: mdkText,
+            text: curr.token,
+            line: curr.line,
+            wsno: curr.wsno
+          ))
         of mtkEmphasis:
           var emphChildren: seq[MarkdownNode] = @[]
+          let emphLine = curr.line
+          let emphWsno = curr.wsno
           curr = lex.nextToken()
           while curr.kind != mtkEmphasis and curr.kind != mtkStrong and curr.kind != mtkEOF:
             if curr.kind == mtkText:
-              emphChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
+              emphChildren.add(MarkdownNode(
+                kind: mdkText,
+                text: curr.token,
+                line: curr.line,
+                wsno: curr.wsno
+              ))
             curr = lex.nextToken()
-          strongChildren.add(MarkdownNode(kind: mdkEmphasis, children: MarkdownNodeList(items: emphChildren)))
+          strongChildren.add(MarkdownNode(
+            kind: mdkEmphasis,
+            children: MarkdownNodeList(items: emphChildren),
+            line: emphLine,
+            wsno: emphWsno
+          ))
         else:
-          strongChildren.add(MarkdownNode(kind: mdkText, text: curr.token))
+          strongChildren.add(MarkdownNode(
+            kind: mdkText,
+            text: curr.token,
+            line: curr.line,
+            wsno: curr.wsno
+          ))
         curr = lex.nextToken()
-      result.add(MarkdownNode(kind: mdkStrong, children: MarkdownNodeList(items: strongChildren)))
+      result.add(MarkdownNode(
+        kind: mdkStrong,
+        children: MarkdownNodeList(items: strongChildren),
+        line: strongLine,
+        wsno: strongWsno
+      ))
       if curr.kind == mtkStrong:
         curr = lex.nextToken()
     else:
-      result.add(MarkdownNode(kind: mdkText, text: curr.token))
+      result.add(MarkdownNode(
+        kind: mdkText,
+        text: curr.token,
+        line: curr.line,
+        wsno: curr.wsno
+      ))
       curr = lex.nextToken()
 
 proc parseListItem(md: var Markdown): MarkdownNode =
@@ -220,7 +340,9 @@ proc parseListItem(md: var Markdown): MarkdownNode =
   let isOrdered = md.parser.curr.kind == mtkOListItem
   result = MarkdownNode(
     kind: mdkListItem,
-    children: MarkdownNodeList(items: @[])
+    children: MarkdownNodeList(items: @[]),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
   )
   if itemText.len > 0:
     for n in md.parseInline(itemText):
@@ -235,7 +357,9 @@ proc parseListItem(md: var Markdown): MarkdownNode =
       var nestedList = MarkdownNode(
         kind: mdkList,
         listOrdered: nextOrdered,
-        children: MarkdownNodeList(items: @[])
+        children: MarkdownNodeList(items: @[]),
+        line: md.parser.curr.line,
+        wsno: md.parser.curr.wsno
       )
       while md.parser.curr.kind in {mtkListItem, mtkOListItem} and md.parser.curr.wsno == nextIndent:
         let nestedItem = md.parseListItem()
@@ -250,7 +374,9 @@ proc parseList(md: var Markdown): MarkdownNode =
   result = MarkdownNode(
     kind: mdkList,
     listOrdered: isOrdered,
-    children: MarkdownNodeList(items: @[])
+    children: MarkdownNodeList(items: @[]),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
   )
   while md.parser.curr.kind in {mtkListItem, mtkOListItem} and md.parser.curr.wsno == startIndent:
     # If the list type changes, break and let the main parser handle the new list
@@ -264,7 +390,9 @@ proc parseBlockquote(md: var Markdown): MarkdownNode =
   let startIndent = md.parser.curr.wsno
   result = MarkdownNode(
     kind: mdkBlockquote,
-    children: MarkdownNodeList(items: @[])
+    children: MarkdownNodeList(items: @[]),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
   )
   while md.parser.curr.kind == mtkBlockquote and md.parser.curr.wsno == startIndent:
     let quoteText = md.parser.curr.token.strip()
@@ -284,7 +412,12 @@ proc parseBlockquote(md: var Markdown): MarkdownNode =
 template withCurrentParagraph(body: untyped): untyped =
   # Ensure currentParagraph is initialized
   if currentParagraph.isNil:
-    currentParagraph = MarkdownNode(kind: mdkParagraph, children: MarkdownNodeList())
+    currentParagraph = MarkdownNode(
+      kind: mdkParagraph,
+      children: MarkdownNodeList(),
+      line: md.parser.curr.line,
+      wsno: md.parser.curr.wsno
+    )
   body
 
 template closeCurrentParagraph(): untyped =
@@ -322,16 +455,28 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
   )
   md.parser.curr = md.parser.lexer.nextToken()
   md.parser.next = md.parser.lexer.nextToken()
-  var currentParagraph: MarkdownNode = nil
+  var currentParagraph: MarkdownNode
   while md.parser.curr.kind != mtkEOF:
     let curr = md.parser.curr
     case curr.kind
     of mtkText:
-      if curr.col == 0 or currentParagraph.isNil:
-        # Start a new paragraph
-        if not currentParagraph.isNil:
-          md.ast.add(currentParagraph)
-        currentParagraph = MarkdownNode(kind: mdkParagraph, children: MarkdownNodeList())
+      if currentParagraph.isNil:
+        currentParagraph = MarkdownNode(
+          kind: mdkParagraph,
+          children: MarkdownNodeList(),
+          line: curr.line,
+          wsno: curr.wsno
+        )
+      elif curr.col == 0:
+        if md.ast.len > 0 and curr.line - currentParagraph.line > 2:
+          # New paragraph after blank line
+          closeCurrentParagraph() # Flush existing paragraph
+          currentParagraph = MarkdownNode(
+            kind: mdkParagraph,
+            children: MarkdownNodeList(),
+            line: curr.line,
+            wsno: curr.wsno
+          )
       let textNode = md.parseText()
       currentParagraph.children.items.add(textNode)
       md.advance()
@@ -341,10 +486,10 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
       md.ast.add(imgNode)
       md.advance()
     of mtkLink:
-      closeCurrentParagraph()
-      let linkNode = md.parseLink()
-      md.ast.add(linkNode)
-      md.advance()
+      withCurrentParagraph do:
+        let node = md.parseLink()
+        currentParagraph.children.items.add(node)
+        md.advance()
     of mtkStrong:
       # parse strong text and add to current paragraph
       withCurrentParagraph do:
@@ -362,7 +507,9 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         kind: mdkHeading,
         level: curr.attrs.get()[0].parseInt,
         textHeading: text,
-        children: nil
+        children: nil,
+        line: curr.line,
+        wsno: curr.wsno
       )
       if md.opts.enableAnchors:
         var anchor = slugify(text)
@@ -384,10 +531,20 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
           withCurrentParagraph do:
             let textValue =
               curr.token.multiReplace(("<", "&lt;"), (">", "&gt;"))
-            currentParagraph.children.items.add(MarkdownNode(kind: mdkText, text: textValue))
+            currentParagraph.children.items.add(MarkdownNode(
+              kind: mdkText,
+              text: textValue,
+              line: curr.line,
+              wsno: curr.wsno
+            ))
             md.advance()
             continue
-      let htmlNode = MarkdownNode(kind: mdkHtml, html: curr.token)
+      let htmlNode = MarkdownNode(
+        kind: mdkHtml,
+        html: curr.token,
+        line: curr.line,
+        wsno: curr.wsno
+      )
       if tagType notin blockLevelTags:
         # Inline HTML: add to current paragraph
         withCurrentParagraph do:
@@ -395,9 +552,7 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
         md.advance()
       else:
         # Block-level HTML: flush paragraph and add as block
-        if not currentParagraph.isNil:
-          md.ast.add(currentParagraph)
-          currentParagraph = nil
+        closeCurrentParagraph()
         md.ast.add(htmlNode)
         md.advance()
     of mtkListItem, mtkOListItem:
@@ -408,12 +563,23 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
       # handle code blocks
       closeCurrentParagraph()
       let lang = if curr.attrs.isSome and curr.attrs.get().len > 0: curr.attrs.get()[0] else: ""
-      let codeNode = MarkdownNode(kind: mdkCodeBlock, code: curr.token, codeLang: lang)
+      let codeNode = MarkdownNode(
+        kind: mdkCodeBlock,
+        code: curr.token,
+        codeLang: lang,
+        line: curr.line,
+        wsno: curr.wsno
+      )
       md.ast.add(codeNode)
       md.advance()
     of mtkInlineCode:
       withCurrentParagraph do:
-        let codeNode = MarkdownNode(kind: mdkInlineCode, inlineCode: curr.token)
+        let codeNode = MarkdownNode(
+          kind: mdkInlineCode,
+          inlineCode: curr.token,
+          line: curr.line,
+          wsno: curr.wsno
+        )
         currentParagraph.children.items.add(codeNode)
       md.advance()
     of mtkBlockquote:
@@ -423,7 +589,9 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
     else:
       closeCurrentParagraph()
       md.advance()
+
   if not currentParagraph.isNil:
+    # Add any remaining paragraph to the AST
     md.ast.add(currentParagraph)
   md # returns the markdown instance
 
