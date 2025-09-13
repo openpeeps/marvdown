@@ -83,6 +83,8 @@ elif isMainModule:
     
 else:
   # Use Marvdown as Nimble library
+  import std/[htmlparser, xmltree]
+
   import ./marvdown/[parser, ast, renderer]
   export parser, ast, renderer
 
@@ -91,3 +93,7 @@ else:
     var md = newMarkdown(content)
     md.toHtml()
 
+  proc toXML*(content: sink string): XmlNode =
+    ## Convert Markdown content to XML Node
+    var md = newMarkdown(content)
+    htmlparser.parseHtml(md.toHtml())

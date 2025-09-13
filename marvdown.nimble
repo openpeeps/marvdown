@@ -12,9 +12,9 @@ installExt    = @["nim"]
 # Dependencies
 
 requires "nim >= 2.0.0"
-requires "kapsis"
-requires "denim"
-requires "jsony"
+requires "kapsis#head"
+requires "denim#head"
+requires "jsony#head"
 
 task napi, "Build Marvdown as a Node.js addon using N-API":
   exec "denim build src/marvdown.nim --cmake -y"
