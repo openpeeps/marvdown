@@ -21,6 +21,8 @@
 - [x] Nim library for easy integration in your 👑 Nim projects
 - [x] Addon for Node.js JavaScript runtime via N-API
 - [x] Markdown to HTML
+  - [ ] Auto-generate Table of Contents (ToC)
+  - [x] Auto-generate heading IDs for anchor links
 - [ ] Markdown to PDF
 - [ ] Markdown to JSON (structured data)
 - [ ] GitHub Flavored Markdown (GFM)
@@ -40,6 +42,13 @@ For Node.js install Marvdown via [npm](https://www.npmjs.com/package/@openpeeps/
 A GitHub action will build the binary CLI app and Node.js addon evertime a new release is published. Download the latest version of Marvdown from the [Github releases page](https://github.com/openpeeps/marvdown/releases).
 
 ## Example Usage
+Using Marvdown from the command line is super easy. Just run:
+```
+marvdown html sample.md --optAnchors --bench
+```
+Enable anchor generations for headings with `--optAnchors` flag. Run benchmarks with `--bench` flag.
+
+### Programming with Marvdown
 
 In Nim language the fastest way to convert markdown to HTML is to use the `toHtml()` proc.
 ```nim
