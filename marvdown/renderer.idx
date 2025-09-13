@@ -1,0 +1,2 @@
+nimTitle	renderer	marvdown/renderer.html	module marvdown/renderer		0
+nim	renderNode	marvdown/renderer.html#renderNode,MarkdownNode	proc renderNode(node: MarkdownNode): string		13

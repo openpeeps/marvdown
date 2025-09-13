@@ -1,0 +1,13 @@
+nimTitle	parser	marvdown/parser.html	module marvdown/parser		0
+nim	MarkdownParser	marvdown/parser.html#MarkdownParser	object MarkdownParser		15
+nim	HeadlineAnchor	marvdown/parser.html#HeadlineAnchor	type HeadlineAnchor		20
+nim	Markdown	marvdown/parser.html#Markdown	type Markdown		22
+nim	tagNone	marvdown/parser.html#tagNone	TagType.tagNone		34
+nim	tagInline	marvdown/parser.html#tagInline	TagType.tagInline		34
+nim	tagBlock	marvdown/parser.html#tagBlock	TagType.tagBlock		34
+nim	tagAll	marvdown/parser.html#tagAll	TagType.tagAll		34
+nim	TagType	marvdown/parser.html#TagType	enum TagType		34
+nim	MarkdownOptions	marvdown/parser.html#MarkdownOptions	object MarkdownOptions		40
+nim	advance	marvdown/parser.html#advance,Markdown,int	proc advance(md: var Markdown; offset = 1)		57
+nim	newMarkdown	marvdown/parser.html#newMarkdown,sinkstring,MarkdownOptions	proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown		316
+nim	toHtml	marvdown/parser.html#toHtml,Markdown	proc toHtml(md: Markdown): string		430
