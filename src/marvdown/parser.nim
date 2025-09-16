@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[strutils, options, tables, unidecode, json]
+import std/[strutils, sequtils, options, tables, unidecode, json]
 
 import htmlparser {.all.}
 export HtmlTag
@@ -17,8 +17,6 @@ type
     lexer: MarkdownLexer
     prev, curr, next: MarkdownTokenTuple
 
-  HeadlineAnchor* = string
-
   Markdown* = ref object
     parser: MarkdownParser
       ## Internal: The markdown parser instance
@@ -26,8 +24,10 @@ type
       ## Minify the output HTML (default: true)
     opts*: MarkdownOptions
       ## Options for allowed HTML tags and attributes
-    selectors*: CountTableRef[HeadlineAnchor]
+    selectors: OrderedTableRef[string, string]
       ## Internal: Used for generating unique headline anchors
+    selectorCounter: CountTableRef[string]
+      ## Internal: Counter for generating unique selectors
     ast*: seq[MarkdownNode]
       ## The abstract syntax tree (AST) of the parsed markdown document
 
@@ -405,19 +405,23 @@ proc parseBlockquote(md: var Markdown): MarkdownNode =
       let nested = md.parseBlockquote()
       result.children.items.add(nested)
 
-
 #
 # Init Marvdown with content and options
 #
+
+proc newParagraph*(curr: MarkdownTokenTuple): MarkdownNode =
+  ## Create a new empty paragraph node
+  MarkdownNode(
+    kind: mdkParagraph,
+    children: MarkdownNodeList(),
+    line: 0,
+    wsno: 0
+  )
+
 template withCurrentParagraph(body: untyped): untyped =
   # Ensure currentParagraph is initialized
   if currentParagraph.isNil:
-    currentParagraph = MarkdownNode(
-      kind: mdkParagraph,
-      children: MarkdownNodeList(),
-      line: md.parser.curr.line,
-      wsno: md.parser.curr.wsno
-    )
+    currentParagraph = newParagraph(curr)
   body
 
 template closeCurrentParagraph(): untyped =
@@ -438,7 +442,7 @@ let defaultOptions = MarkdownOptions(
     tagA, tagAbbr, tagB, tagBlockquote, tagBr,
     tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
     tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
-    tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl
+    tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagMark, tagSmall, tagSub, tagSup
   ],
   allowTagsByType: tagNone,
   allowInlineStyle: false,
@@ -446,12 +450,15 @@ let defaultOptions = MarkdownOptions(
   enableAnchors: true
 )
 
-proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions): Markdown =
+
+proc newMarkdown*(content: sink string,
+          opts: MarkdownOptions = defaultOptions): Markdown =
   ## Create a new Markdown instance
   var md = Markdown(
     parser: MarkdownParser(lexer: initLexer(content)),
     opts: opts,
-    selectors: newCountTable[HeadlineAnchor]()
+    selectors: newOrderedTable[string, string](),
+    selectorCounter: newCountTable[string]()
   )
   md.parser.curr = md.parser.lexer.nextToken()
   md.parser.next = md.parser.lexer.nextToken()
@@ -461,22 +468,12 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
     case curr.kind
     of mtkText:
       if currentParagraph.isNil:
-        currentParagraph = MarkdownNode(
-          kind: mdkParagraph,
-          children: MarkdownNodeList(),
-          line: curr.line,
-          wsno: curr.wsno
-        )
+        currentParagraph = newParagraph(curr)
       elif curr.col == 0:
-        if md.ast.len > 0 and curr.line - currentParagraph.line > 2:
+        if md.ast.len > 0 and curr.line - currentParagraph.line > 1:
           # New paragraph after blank line
           closeCurrentParagraph() # Flush existing paragraph
-          currentParagraph = MarkdownNode(
-            kind: mdkParagraph,
-            children: MarkdownNodeList(),
-            line: curr.line,
-            wsno: curr.wsno
-          )
+          currentParagraph = newParagraph(curr)
       let textNode = md.parseText()
       currentParagraph.children.items.add(textNode)
       md.advance()
@@ -513,13 +510,15 @@ proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions):
       )
       if md.opts.enableAnchors:
         var anchor = slugify(text)
-        if md.selectors.contains(anchor):
+        if md.selectorCounter.contains(anchor):
           # make unique anchors - e.g., "heading-2", "heading-3", etc.
-          let count = md.selectors[anchor] + 1
-          md.selectors[anchor] = count
+          let count = md.selectorCounter[anchor] + 1
+          md.selectorCounter[anchor] = count
           anchor.add("-" & $count)
+          md.selectors[anchor] = text
         else: # first occurrence
-          md.selectors[anchor] = 1
+          md.selectorCounter[anchor] = 1
+          md.selectors[anchor] = text
         headingNode.textAnchor = some(anchor)
       md.ast.add(headingNode)
       md.advance()
@@ -599,3 +598,18 @@ proc toHtml*(md: Markdown): string =
   ## Convert the parsed Markdown AST to HTML
   for node in md.ast:
     add result, renderer.renderNode(node)
+
+proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
+  ## Get the headline selectors (anchors) from the parsed Markdown
+  md.selectors
+
+proc hasSelectors*(md: Markdown): bool =
+  ## Check if there are any headline selectors (anchors) in the parsed Markdown
+  md.selectors.len > 0
+
+proc getTitle*(md: Markdown): string =
+  ## Retrieve the first heading as the document title
+  if md.selectors.len > 0:
+    let firstKey = md.selectors.keys().toSeq()[0]
+    md.selectors[firstKey]
+  else: "Untitled document"

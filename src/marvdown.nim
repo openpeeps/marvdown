@@ -36,7 +36,7 @@ elif isMainModule:
       size = filePath.getFileSize
       content = readFile(filePath)
       showBench = v.has("--bench")
-      
+
       # Default Markdown options
       markdownOptions = MarkdownOptions(
         allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
@@ -87,6 +87,8 @@ else:
 
   import ./marvdown/[parser, ast, renderer]
   export parser, ast, renderer
+
+  export hasSelectors, getSelectors, getTitle
 
   proc toHtml*(content: sink string): owned string =
     ## Convert Markdown content to HTML
