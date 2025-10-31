@@ -239,13 +239,32 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         if lex.current == '(':
           lex.advance()
           lex.strbuf.setLen(0)
+          var src = ""
+          var title = ""
+          var inTitle = false
           while lex.current != ')' and lex.current != '\0':
-            lex.strbuf.add(lex.current)
+            if lex.current == '"' and not inTitle:
+              inTitle = true
+              lex.advance()
+              continue
+            if inTitle:
+              if lex.current == '"':
+                inTitle = false
+                lex.advance()
+                continue
+              title.add(lex.current)
+            else:
+              if lex.current == ' ':
+                lex.advance()
+                continue
+              src.add(lex.current)
             lex.advance()
-          let src = lex.strbuf
           if lex.current == ')':
             lex.advance()
-          return newTokenTuple(lex, mtkImage, wsno=wsno, attrs=some(@[alt, src]))
+          if title.len > 0:
+            return newTokenTuple(lex, mtkImage, wsno=wsno, attrs=some(@[alt, src, title]))
+          else:
+            return newTokenTuple(lex, mtkImage, wsno=wsno, attrs=some(@[alt, src]))
     else:
       var text = "!"
       lex.advance()

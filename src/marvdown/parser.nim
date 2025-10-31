@@ -264,7 +264,10 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
       if curr.attrs.isSome and curr.attrs.get().len >= 2:
         let alt = curr.attrs.get()[0]
         let src = curr.attrs.get()[1]
-        let title = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
+        let title =
+          if curr.attrs.get().len > 2:
+            curr.attrs.get()[2]
+          else: ""
         node = MarkdownNode(
           kind: mdkImage,
           imageAlt: alt,
