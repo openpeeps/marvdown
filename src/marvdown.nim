@@ -46,7 +46,8 @@ elif isMainModule:
         enableAnchors: v.has("--optAnchors")
       )
       t = cpuTime() # start timer after reading file
-      md = newMarkdown(content, markdownOptions)
+
+    var md = newMarkdown(content, markdownOptions)
 
     var outputPath =
       if hasOutputPath:
@@ -85,8 +86,8 @@ else:
   # Use Marvdown as Nimble library
   import std/[htmlparser, xmltree]
 
-  import ./marvdown/[parser, ast, renderer]
-  export parser, ast, renderer
+  import ./marvdown/[parser, ast]
+  export parser, ast
 
   export hasSelectors, getSelectors, getTitle
 

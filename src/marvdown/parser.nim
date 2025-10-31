@@ -4,12 +4,13 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[strutils, sequtils, options, tables, unidecode, json]
+import std/[strutils, sequtils, options,
+        tables, unidecode, json, xmltree]
 
 import htmlparser {.all.}
 export HtmlTag
 
-import ./lexer, ./ast, renderer
+import ./lexer, ./ast
 
 type
   MarkdownParser* = object
@@ -53,6 +54,8 @@ type
       ## For allowing use of `style` attribute, enable `allowInlineStyle`.
     enableAnchors*: bool
       ## Enable anchor generation in title blocks (enabled by default)
+
+proc renderNode(md: var Markdown, node: MarkdownNode): string
 
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
@@ -184,14 +187,15 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
   let ln = curr.line
   while curr.kind != mtkEOF:
     if curr.line != ln: break
+    var node: MarkdownNode
     case curr.kind
     of mtkText:
-      result.add(MarkdownNode(
+      node = MarkdownNode(
         kind: mdkText,
         text: curr.token,
         line: curr.line,
         wsno: curr.wsno
-      ))
+      )
       curr = lex.nextToken()
     of mtkEmphasis:
       let startCol = curr.col
@@ -199,7 +203,7 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
       if next.kind == mtkText:
         let after = lex.nextToken()
         if after.kind == mtkEmphasis:
-          result.add(MarkdownNode(
+          node = MarkdownNode(
             kind: mdkEmphasis,
             children: MarkdownNodeList(items: @[MarkdownNode(
               kind: mdkText,
@@ -209,47 +213,51 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
             )]),
             line: curr.line,
             wsno: curr.wsno
-          ))
+          )
           curr = lex.nextToken()
-          continue
         else:
-          result.add(MarkdownNode(
+          node = MarkdownNode(
             kind: mdkText,
             text: text[startCol-1 ..< text.len],
             line: curr.line,
             wsno: curr.wsno
-          ))
+          )
           curr = after
-          continue
       else:
-        result.add(MarkdownNode(
+        node = MarkdownNode(
           kind: mdkText,
           text: text[startCol-1 ..< text.len],
           line: curr.line,
           wsno: curr.wsno
-        ))
+        )
         curr = next
-        continue
     of mtkLink:
       # Parse link inline
       if curr.attrs.isSome and curr.attrs.get().len >= 2:
         let textVal = curr.attrs.get()[0]
         let hrefVal = curr.attrs.get()[1]
-        let titleVal = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
+        let titleVal =
+          if curr.attrs.get().len > 2:
+            curr.attrs.get()[2]
+          else: "" # no title
+
         let textNode = MarkdownNode(
           kind: mdkText,
           text: textVal,
           line: curr.line,
           wsno: curr.wsno
         )
-        result.add(MarkdownNode(
+        let linkNode = MarkdownNode(
           kind: mdkLink,
           linkHref: hrefVal,
           linkTitle: titleVal,
-          children: MarkdownNodeList(items: @[textNode]),
+          children: MarkdownNodeList(),
           line: curr.line,
           wsno: curr.wsno
-        ))
+        )
+        for n in md.parseInline(textVal):
+          linkNode.children.items.add(n)
+        result.add(linkNode)
       curr = lex.nextToken()
     of mtkImage:
       # Parse image inline
@@ -257,22 +265,22 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         let alt = curr.attrs.get()[0]
         let src = curr.attrs.get()[1]
         let title = if curr.attrs.get().len > 2: curr.attrs.get()[2] else: ""
-        result.add(MarkdownNode(
+        node = MarkdownNode(
           kind: mdkImage,
           imageAlt: alt,
           imageSrc: src,
           imageTitle: title,
           line: curr.line,
           wsno: curr.wsno
-        ))
+        )
       curr = lex.nextToken()
     of mtkInlineCode:
-      result.add(MarkdownNode(
+      node = MarkdownNode(
         kind: mdkInlineCode,
         inlineCode: curr.token,
         line: curr.line,
         wsno: curr.wsno
-      ))
+      )
       curr = lex.nextToken()
     of mtkStrong:
       var strongChildren: seq[MarkdownNode] = @[]
@@ -316,22 +324,25 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
             wsno: curr.wsno
           ))
         curr = lex.nextToken()
-      result.add(MarkdownNode(
+      node = MarkdownNode(
         kind: mdkStrong,
         children: MarkdownNodeList(items: strongChildren),
         line: strongLine,
         wsno: strongWsno
-      ))
+      )
       if curr.kind == mtkStrong:
         curr = lex.nextToken()
     else:
-      result.add(MarkdownNode(
+      node = MarkdownNode(
         kind: mdkText,
         text: curr.token,
         line: curr.line,
         wsno: curr.wsno
-      ))
+      )
       curr = lex.nextToken()
+    
+    # add the parsed node to result
+    if node != nil: result.add(node)
 
 proc parseListItem(md: var Markdown): MarkdownNode =
   # Parse a single list item, handling nested lists recursively
@@ -450,19 +461,7 @@ let defaultOptions = MarkdownOptions(
   enableAnchors: true
 )
 
-
-proc newMarkdown*(content: sink string,
-          opts: MarkdownOptions = defaultOptions): Markdown =
-  ## Create a new Markdown instance
-  var md = Markdown(
-    parser: MarkdownParser(lexer: initLexer(content)),
-    opts: opts,
-    selectors: newOrderedTable[string, string](),
-    selectorCounter: newCountTable[string]()
-  )
-  md.parser.curr = md.parser.lexer.nextToken()
-  md.parser.next = md.parser.lexer.nextToken()
-  var currentParagraph: MarkdownNode
+proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
   while md.parser.curr.kind != mtkEOF:
     let curr = md.parser.curr
     case curr.kind
@@ -500,26 +499,19 @@ proc newMarkdown*(content: sink string,
     of mtkHeading:
       closeCurrentParagraph()
       let text = curr.token.strip()
+      var textAnchor: string
       let headingNode = MarkdownNode(
         kind: mdkHeading,
-        level: curr.attrs.get()[0].parseInt,
-        textHeading: text,
-        children: nil,
+        level: curr.attrs.get()[0].parseInt, # heading level from attrs
+        children: MarkdownNodeList(),
         line: curr.line,
         wsno: curr.wsno
       )
-      if md.opts.enableAnchors:
-        var anchor = slugify(text)
-        if md.selectorCounter.contains(anchor):
-          # make unique anchors - e.g., "heading-2", "heading-3", etc.
-          let count = md.selectorCounter[anchor] + 1
-          md.selectorCounter[anchor] = count
-          anchor.add("-" & $count)
-          md.selectors[anchor] = text
-        else: # first occurrence
-          md.selectorCounter[anchor] = 1
-          md.selectors[anchor] = text
-        headingNode.textAnchor = some(anchor)
+
+      # parse inline content of the heading
+      for n in md.parseInline(text):
+        headingNode.children.items.add(n)
+
       md.ast.add(headingNode)
       md.advance()
     of mtkHtml:
@@ -589,15 +581,28 @@ proc newMarkdown*(content: sink string,
       closeCurrentParagraph()
       md.advance()
 
-  if not currentParagraph.isNil:
-    # Add any remaining paragraph to the AST
-    md.ast.add(currentParagraph)
-  md # returns the markdown instance
+proc newMarkdown*(content: sink string,
+          opts: MarkdownOptions = defaultOptions): Markdown =
+  ## Create a new Markdown instance
+  var md = Markdown(
+    parser: MarkdownParser(lexer: initLexer(content)),
+    opts: opts,
+    selectors: newOrderedTable[string, string](),
+    selectorCounter: newCountTable[string]()
+  )
+  md.parser.curr = md.parser.lexer.nextToken()
+  md.parser.next = md.parser.lexer.nextToken()
 
-proc toHtml*(md: Markdown): string =
+  var currentParagraph: MarkdownNode
+  md.parseMarkdown(currentParagraph)
+  if not currentParagraph.isNil:
+    md.ast.add(currentParagraph) # add any remaining paragraph
+  md
+
+proc toHtml*(md: var Markdown): string =
   ## Convert the parsed Markdown AST to HTML
   for node in md.ast:
-    add result, renderer.renderNode(node)
+    add result, md.renderNode(node)
 
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
@@ -613,3 +618,113 @@ proc getTitle*(md: Markdown): string =
     let firstKey = md.selectors.keys().toSeq()[0]
     md.selectors[firstKey]
   else: "Untitled document"
+
+#
+# Convert parsed Markdown to HTML
+#
+import std/htmlgen
+
+proc renderNode(md: var Markdown, node: MarkdownNode): string =
+  ## Render a single MarkdownNode to HTML. This proc is called recursively for child nodes.
+  case node.kind
+  of mdkText:
+    result = indent(node.text, node.wsno)
+  of mdkStrong:
+    var content = ""
+    for child in node.children.items:
+      content.add(md.renderNode(child))
+    result = strong(content)
+  of mdkEmphasis:
+    var content = ""
+    for child in node.children.items:
+      content.add(md.renderNode(child))
+    result = em(content)
+  of mdkLink:
+    var linkContent = ""
+    for child in node.children.items:
+      linkContent.add(md.renderNode(child))
+    result = a(href=node.linkHref, title=node.linkTitle, linkContent)
+  of mdkImage:
+    result = img(src=node.imageSrc, alt=node.imageAlt, title=node.imageTitle)
+  of mdkList:
+    var listItems = ""
+    for item in node.children.items:
+      listItems.add(md.renderNode(item))
+    if node.listOrdered:
+      result = ol(listItems)
+    else:
+      result = ul(listItems)
+  of mdkListItem:
+    var itemContent = ""
+    for child in node.children.items:
+      itemContent.add(md.renderNode(child))
+    result = li(itemContent)
+  of mdkHeading:
+    # Write headline with anchor if enabled
+    var innerContent: string
+    for childNode in node.children.items:
+      innerContent.add(md.renderNode(childNode))
+
+    if md.opts.enableAnchors:
+      # if anchors are enabled, generate unique anchors
+      var anchor = slugify(parseHtml(innerContent).innerText)
+      if md.selectorCounter.contains(anchor):
+        # make unique anchors - e.g., "heading-2", "heading-3", etc.
+        let count = md.selectorCounter[anchor] + 1
+        md.selectorCounter[anchor] = count
+        anchor.add("-" & $count)
+        md.selectors[anchor] = anchor
+      else: # first occurrence
+        md.selectorCounter[anchor] = 1
+        md.selectors[anchor] = anchor
+      let anchorlink = a(href="#" & anchor, `class`="anchor-link", "🔗")
+      add result,
+        case node.level
+        of 1: h1(id=anchor, anchorlink, innerContent)
+        of 2: h2(id=anchor, anchorlink, innerContent)
+        of 3: h3(id=anchor, anchorlink, innerContent)
+        of 4: h4(id=anchor, anchorlink, innerContent)
+        of 5: h5(id=anchor, anchorlink, innerContent)
+        else: h6(id=anchor, anchorlink, innerContent)
+    else:
+      add result,
+        case node.level
+        of 1: h1(innerContent)
+        of 2: h2(innerContent)
+        of 3: h3(innerContent)
+        of 4: h4(innerContent)
+        of 5: h5(innerContent)
+        else: h6(innerContent)
+  of mdkHtml:
+    result = node.html
+  of mdkParagraph:
+    # Write paragraph
+    var paraContent = ""
+    for child in node.children.items:
+      case child.kind
+      of mdkHtml:
+        paraContent.add(child.html)
+      else:
+        paraContent.add(md.renderNode(child))
+    add result, p(paraContent)
+  of mdkCodeBlock:
+    # Code block with optional language class
+    let codeBlock = node.code.multiReplace(
+        ("<", "&lt;"), (">", "&gt;"),
+        ("\"", "&quot;"), ("&", "&amp;")
+      )
+    let classAttr = if node.codeLang.len > 0: " class=\"language-" & node.codeLang & "\"" else: ""
+    result.add("<pre><code" & classAttr & ">" & codeBlock.strip() & "</code></pre>")
+  of mdkInlineCode:
+    let inlineCode = node.inlineCode.multiReplace(
+        ("<", "&lt;"), (">", "&gt;"),
+        ("\"", "&quot;"), ("&", "&amp;")
+      )
+    result = "<code>" & inlineCode & "</code>"
+  of mdkBlockquote:
+    var bqContent = ""
+    for child in node.children.items:
+      bqContent.add(md.renderNode(child))
+    result = "<blockquote>" & bqContent & "</blockquote>"
+  else:
+    discard

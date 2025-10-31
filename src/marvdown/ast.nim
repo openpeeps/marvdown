@@ -52,8 +52,6 @@ type
     of mdkHeading:
       level*: range[1..6]
         ## Heading level (1-6)
-      textHeading*: string
-        ## Heading text content
       textAnchor*: Option[string]
         ## Anchor for the heading (for linking)
         ## Generated if `enableAnchors` is true in `MarkdownOptions`
