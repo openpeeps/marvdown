@@ -14,6 +14,7 @@ type
     mtkHeading,        # Heading (h1, h2, h3, etc.)
     mtkList,           # Ordered or unordered list
     mtkListItem,       # List item
+    mtkListItemCheckbox, # List item checkbox
     mtkOListItem,      # Ordered list item
     mtkBlockquote,     # Blockquote
     mtkHorizontalRule, # Horizontal rule (--- or ***)
@@ -144,6 +145,29 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count), wsno=wsno)
     elif (ch in {'-', '*', '+'}) and (lex.current == ' ' or lex.current == '\t'):
       lex.advance()
+      # Check for checkbox pattern
+      while lex.current == ' ' or lex.current == '\t':
+        lex.advance()
+      if lex.current == '[' and (lex.peek() == 'x' or lex.peek() == ' '):
+        lex.advance() # skip '['
+        let cbChar = lex.current
+        lex.advance() # skip 'x' or ' '
+        if lex.current == ']':
+          lex.advance()
+          # Skip whitespace after checkbox
+          while lex.current == ' ' or lex.current == '\t':
+            lex.advance()
+          # Read rest of line as item text
+          lex.strbuf.setLen(0)
+          while lex.current notin {'\n', '\r', '\0'}:
+            lex.strbuf.add(lex.current)
+            lex.advance()
+          let checkState =
+            if cbChar == 'x': "checked"
+                        else: "unchecked"
+          return newTokenTuple(lex, mtkListItemCheckbox,
+                  lex.strbuf.strip(), wsno=wsno, attrs=some(@["checkbox", checkState]))
+      # Otherwise, normal list item
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
@@ -270,7 +294,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
       return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '[':
-    # Link
+    # Link or Checkbox
     lex.advance()
     lex.strbuf.setLen(0)
     while lex.current != ']' and lex.current != '\0':
@@ -282,13 +306,41 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       if lex.current == '(':
         lex.advance()
         lex.strbuf.setLen(0)
-        while lex.current != ')' and lex.current != '\0':
+        # Parse href
+        while lex.current notin {' ', '\t', ')', '\n', '\r', '\0'}:
           lex.strbuf.add(lex.current)
           lex.advance()
         let href = lex.strbuf
+        var title = ""
+        # Parse optional title
+        while lex.current == ' ' or lex.current == '\t':
+          lex.advance()
+        if lex.current == '"':
+          lex.advance()
+          var titleBuf = ""
+          while lex.current != '"' and lex.current != '\0' and lex.current != ')':
+            titleBuf.add(lex.current)
+            lex.advance()
+          title = titleBuf
+          if lex.current == '"':
+            lex.advance()
+        # Skip whitespace before closing ')'
+        while lex.current == ' ' or lex.current == '\t':
+          lex.advance()
         if lex.current == ')':
           lex.advance()
-        return newTokenTuple(lex, mtkLink, wsno=wsno, attrs=some(@[text, href]))
+        if title.len > 0:
+          return newTokenTuple(lex, mtkLink, wsno=wsno, attrs=some(@[text, href, title]))
+        else:
+          return newTokenTuple(lex, mtkLink, wsno=wsno, attrs=some(@[text, href]))
+      # elif text == "x":
+      #   # Special case for [x] checkbox
+      #   return newTokenTuple(lex, mtkListItemCheckbox,
+      #                          wsno=wsno, attrs=some(@["checkbox", "checked"]))
+      # elif text == " ":
+      #   # Special case for [ ] checkbox
+      #   return newTokenTuple(lex, mtkListItemCheckbox,
+      #                           wsno=wsno, attrs=some(@["checkbox", "unchecked"]))
     return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '*':
     # Emphasis or strong

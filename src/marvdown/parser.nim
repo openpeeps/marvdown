@@ -55,7 +55,11 @@ type
     enableAnchors*: bool
       ## Enable anchor generation in title blocks (enabled by default)
 
+#
+# forward declarations
+#
 proc renderNode(md: var Markdown, node: MarkdownNode): string
+proc parseInline(md: var Markdown, text: string): seq[MarkdownNode]
 
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
@@ -163,6 +167,38 @@ proc parseStrong(md: var Markdown): MarkdownNode =
   )
   if md.parser.curr.kind == mtkStrong:
     md.advance() # Skip closing strong
+
+proc parseCheckboxItem(md: var Markdown): MarkdownNode =
+  ## Parse a checkbox list item ([ ] or [x])
+  let attrs = md.parser.curr.attrs.get()
+  let checked = attrs.len > 1 and attrs[1] == "checked"
+  result = MarkdownNode(
+    kind: mdkListItem,
+    children: MarkdownNodeList(items: @[]),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  )
+  # Add checkbox input as first child
+  result.children.items.add(MarkdownNode(
+    kind: mdkHtml,
+    html: "<input type=\"checkbox\"" & (if checked: " checked" else: "") & " disabled>",
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  ))
+  
+  let itemText = md.parser.curr.token.strip()
+  if itemText.len > 0:
+    for n in md.parseInline(itemText):
+      result.children.items.add(n)
+  md.advance()
+  
+  # If there's text after the checkbox, parse it as inline
+  # echo md.parser.curr
+  # if md.parser.curr.kind == mtkText and md.parser.curr.token.len > 0:
+  #   echo md.parser.curr.token
+  #   for n in md.parseInline(md.parser.curr.token.strip()):
+  #     result.children.items.add(n)
+  #   md.advance()
 
 proc parseEmphasis(md: var Markdown): MarkdownNode =
   # Parse emphasis text and add to current paragraph
@@ -349,6 +385,9 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
 
 proc parseListItem(md: var Markdown): MarkdownNode =
   # Parse a single list item, handling nested lists recursively
+  if md.parser.curr.kind == mtkListItemCheckbox:
+    # Delegate to checkbox parser
+    return md.parseCheckboxItem()
   let itemText = md.parser.curr.token.strip()
   let indentLevel = md.parser.curr.wsno
   let isOrdered = md.parser.curr.kind == mtkOListItem
@@ -363,7 +402,7 @@ proc parseListItem(md: var Markdown): MarkdownNode =
       result.children.items.add(n)
   md.advance()
   # Check for nested lists
-  while md.parser.curr.kind in {mtkListItem, mtkOListItem}:
+  while md.parser.curr.kind in {mtkListItem, mtkListItemCheckbox, mtkOListItem}:
     let nextIndent = md.parser.curr.wsno
     let nextOrdered = md.parser.curr.kind == mtkOListItem
     if nextIndent > indentLevel:
@@ -375,7 +414,8 @@ proc parseListItem(md: var Markdown): MarkdownNode =
         line: md.parser.curr.line,
         wsno: md.parser.curr.wsno
       )
-      while md.parser.curr.kind in {mtkListItem, mtkOListItem} and md.parser.curr.wsno == nextIndent:
+      while md.parser.curr.kind in {mtkListItem,
+            mtkListItemCheckbox, mtkOListItem} and md.parser.curr.wsno == nextIndent:
         let nestedItem = md.parseListItem()
         nestedList.children.items.add(nestedItem)
       result.children.items.add(nestedList)
@@ -392,10 +432,9 @@ proc parseList(md: var Markdown): MarkdownNode =
     line: md.parser.curr.line,
     wsno: md.parser.curr.wsno
   )
-  while md.parser.curr.kind in {mtkListItem, mtkOListItem} and md.parser.curr.wsno == startIndent:
+  while md.parser.curr.kind in {mtkListItem, mtkListItemCheckbox, mtkOListItem} and md.parser.curr.wsno == startIndent:
     # If the list type changes, break and let the main parser handle the new list
-    if (md.parser.curr.kind == mtkOListItem) != isOrdered:
-      break
+    if (md.parser.curr.kind == mtkOListItem) != isOrdered: break
     let itemNode = md.parseListItem()
     result.children.items.add(itemNode)
 
@@ -549,7 +588,7 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
         closeCurrentParagraph()
         md.ast.add(htmlNode)
         md.advance()
-    of mtkListItem, mtkOListItem:
+    of mtkListItem, mtkOListItem, mtkListItemCheckbox:
       closeCurrentParagraph()
       md.ast.add(md.parseList())
       # do not advance here, parseList already advances
