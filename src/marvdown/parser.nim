@@ -31,6 +31,10 @@ type
       ## Internal: Counter for generating unique selectors
     ast*: seq[MarkdownNode]
       ## The abstract syntax tree (AST) of the parsed markdown document
+    footnotes: OrderedTableRef[string, MarkdownNode]
+      ## Footnote definitions parsed from the document
+    footnotesHtml*: string
+      ## Generated HTML for footnotes at the end of the document
 
   TagType* = enum
     tagNone,       # No tags allowed
@@ -54,6 +58,10 @@ type
       ## For allowing use of `style` attribute, enable `allowInlineStyle`.
     enableAnchors*: bool
       ## Enable anchor generation in title blocks (enabled by default)
+    anchorIcon*: string = "🔗"
+      ## Icon used for anchor links in headings
+    showFootnotes*: bool = true
+      ## Insert footnotes HTML at the end of the document (default: true)
 
 #
 # forward declarations
@@ -503,6 +511,26 @@ let defaultOptions = MarkdownOptions(
   enableAnchors: true
 )
 
+proc parseFootnoteDef(md: var Markdown): MarkdownNode = 
+  ## Parse a footnote definition into a MarkdownNode
+  let id = md.parser.curr.attrs.get()[0]
+  let content = md.parser.curr.token.strip()
+  result = MarkdownNode(
+    kind: mdkFootnoteDef,
+    footnoteId: id,
+    children: MarkdownNodeList(),
+    line: md.parser.curr.line,
+    wsno: md.parser.curr.wsno
+  )
+  # Parse inline content of the footnote definition
+  for n in md.parseInline(content):
+    result.children.items.add(n)
+  
+  # Store the footnote definition in the Markdown instance
+  if md.footnotes.isNil:
+    md.footnotes = newOrderedTable[string, MarkdownNode]()
+  md.footnotes[id] = result
+
 proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
   while md.parser.curr.kind != mtkEOF:
     let curr = md.parser.curr
@@ -619,6 +647,22 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       closeCurrentParagraph()
       let bqNode = md.parseBlockquote()
       md.ast.add(bqNode)
+    of mtkFootnoteRef:
+      withCurrentParagraph do:
+        let id = curr.attrs.get()[0]
+        let fnNode = MarkdownNode(
+          kind: mdkFootnoteRef,
+          footnoteRefId: id,
+          line: curr.line,
+          wsno: curr.wsno
+        )
+        currentParagraph.children.items.add(fnNode)
+      md.advance()
+    of mtkFootnoteDef:
+      closeCurrentParagraph() # close any open paragraph
+      let node = md.parseFootnoteDef()
+      md.ast.add(node)
+      md.advance()
     else:
       closeCurrentParagraph()
       md.advance()
@@ -645,6 +689,8 @@ proc toHtml*(md: var Markdown): string =
   ## Convert the parsed Markdown AST to HTML
   for node in md.ast:
     add result, md.renderNode(node)
+  if md.opts.showFootnotes and md.footnotesHtml.len > 0:
+    add result, "<hr><div class=\"footnotes\">" & md.footnotesHtml & "</div>"
 
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
@@ -652,7 +698,15 @@ proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
 
 proc hasSelectors*(md: Markdown): bool =
   ## Check if there are any headline selectors (anchors) in the parsed Markdown
-  md.selectors.len > 0
+  md.selectors != nil and md.selectors.len > 0
+
+proc getFootnotes*(md: Markdown): OrderedTableRef[string, MarkdownNode] =
+  ## Get the footnote definitions from the parsed Markdown
+  md.footnotes
+
+proc hasFootnotes*(md: Markdown): bool =
+  ## Check if there are any footnote definitions in the parsed Markdown
+  md.footnotes != nil and md.footnotes.len > 0
 
 proc getTitle*(md: Markdown): string =
   ## Retrieve the first heading as the document title
@@ -685,7 +739,11 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     var linkContent = ""
     for child in node.children.items:
       linkContent.add(md.renderNode(child))
-    result = a(href=node.linkHref, title=node.linkTitle, linkContent)
+    result =
+      if node.linkTitle.len > 0:
+        a(href=node.linkHref, title=node.linkTitle, linkContent)
+      else:
+        a(href=node.linkHref, linkContent)
   of mdkImage:
     result = img(src=node.imageSrc, alt=node.imageAlt, title=node.imageTitle)
   of mdkList:
@@ -719,7 +777,9 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
       else: # first occurrence
         md.selectorCounter[anchor] = 1
         md.selectors[anchor] = anchor
-      let anchorlink = a(href="#" & anchor, `class`="anchor-link", "🔗")
+      let anchorlink =
+            a(href="#" & anchor, `class`="anchor-link",
+                    md.opts.anchorIcon)
       add result,
         case node.level
         of 1: h1(id=anchor, anchorlink, innerContent)
@@ -768,5 +828,15 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     for child in node.children.items:
       bqContent.add(md.renderNode(child))
     result = "<blockquote>" & bqContent & "</blockquote>"
+  of mdkFootnoteRef:
+    # Footnote reference rendering
+    result = "<sup class=\"footnote-ref\"><a href=\"#fn-" & node.footnoteRefId & "\">" & node.footnoteRefId & "</a></sup>"
+  of mdkFootnoteDef:
+    # Footnote definition rendering (could be customized)
+    var fnContent = ""
+    for child in node.children.items:
+      fnContent.add(md.renderNode(child))
+    md.footnotesHtml.add("<div class=\"footnote\" id=\"fn-" & node.footnoteId & "\">" &
+             "<sup>" & node.footnoteId & "</sup> " & fnContent & "</div>")
   else:
     discard

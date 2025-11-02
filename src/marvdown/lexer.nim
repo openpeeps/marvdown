@@ -27,6 +27,8 @@ type
     mtkHtml,           # Raw HTML content
     mtkTable,          # Table
     mtkParagraph,      # Paragraph
+    mtkFootnoteRef,    # Footnote reference
+    mtkFootnoteDef,    # Footnote definition
     mtkDocument,       # Root document node
     mtkUnknown         # Unknown or unsupported token
     mtkEOF             # End of file/input
@@ -45,6 +47,7 @@ type
     current*: char
     pos*, line*, col*: int
     strbuf*: string
+    pendingTokens: seq[MarkdownTokenTuple] # Buffer for tokens split from text
 
 #
 # Markdown Lexer
@@ -88,6 +91,37 @@ proc initToken(lex: var MarkdownLexer, kind: MarkdownTokenKind, value: sink stri
 proc newTokenTuple(lex: MarkdownLexer, kind: MarkdownTokenKind, token: string = "", wsno: int = 0, attrs: Option[seq[string]] = none(seq[string])): MarkdownTokenTuple =
   (kind, token, lex.line, lex.col - token.len, lex.pos, wsno, attrs)
 
+proc handleAutoLink(lex: var MarkdownLexer, wsno: int): MarkdownTokenTuple =
+  var tempStrBuf = ""
+  let startPos = lex.pos
+  while lex.current notin {' ', '\t', '\n', '\r', '\0'}:
+    tempStrBuf.add(lex.current)
+    lex.advance()
+  return newTokenTuple(lex, mtkLink, wsno=wsno, attrs=some(@[tempStrBuf, tempStrBuf]))
+
+proc scanTextWithLinks(lex: var MarkdownLexer, wsno: int): seq[MarkdownTokenTuple] =
+  ## Scan plain text and emit mtkText and mtkLink tokens for URLs found anywhere
+  var tokens: seq[MarkdownTokenTuple] = @[]
+  var buf = ""
+  while lex.current notin {'\n', '\r', '\0', '*', '_', '[', ']', '!', '`', '<'}:
+    # Check for http(s):// at current position
+    if lex.current == 'h' and lex.peek() == 't' and lex.peek(2) == 't' and lex.peek(3) == 'p':
+      let isHttp = lex.peek(4) == ':' and lex.peek(5) == '/' and lex.peek(6) == '/'
+      let isHttps = lex.peek(4) == 's' and lex.peek(5) == ':' and lex.peek(6) == '/' and lex.peek(7) == '/'
+      if isHttp or isHttps:
+        # Flush buffer as text token
+        if buf.len > 0:
+          tokens.add(newTokenTuple(lex, mtkText, buf, wsno=wsno))
+          buf.setLen(0)
+        # Handle link
+        tokens.add(lex.handleAutoLink(wsno))
+        continue
+    buf.add(lex.current)
+    lex.advance()
+  if buf.len > 0:
+    tokens.add(newTokenTuple(lex, mtkText, buf, wsno=wsno))
+  return tokens
+
 proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   ## Lex the next token from the input
   var wsno = 0
@@ -116,6 +150,12 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkEOF, wsno=wsno)
 
   # let startCol = wsno # not needed anymore
+
+  # Return buffered tokens if present
+  if lex.pendingTokens.len > 0:
+    let tok = lex.pendingTokens[0]
+    lex.pendingTokens = lex.pendingTokens[1..^1]
+    return tok
 
   case lex.current
   of '#':
@@ -179,6 +219,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         lex.advance(); lex.advance() # skip both delimiters
         return newTokenTuple(lex, mtkStrong, wsno=wsno)
       else:
+        lex.advance();
         return newTokenTuple(lex, mtkEmphasis, wsno=wsno)
     else:
       return newTokenTuple(lex, mtkText, repeat(ch, count), wsno=wsno)
@@ -294,7 +335,34 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
       return newTokenTuple(lex, mtkText, text, wsno=wsno)
   of '[':
-    # Link or Checkbox
+    # Link, Checkbox, or Footnote
+    if lex.peek() == '^':
+      # Footnote reference or definition
+      lex.advance() # skip '['
+      lex.advance() # skip '^'
+      lex.strbuf.setLen(0)
+      while lex.current != ']' and lex.current != '\0':
+        lex.strbuf.add(lex.current)
+        lex.advance()
+      let footId = lex.strbuf
+      if lex.current == ']':
+        lex.advance()
+        if lex.current == ':' and (lex.peek() == ' ' or lex.peek() == '\t'):
+          # Footnote definition: [^id]: text
+          lex.advance() # skip ':'
+          while lex.current == ' ' or lex.current == '\t':
+            lex.advance()
+          lex.strbuf.setLen(0)
+          while lex.current notin {'\n', '\r', '\0'}:
+            lex.strbuf.add(lex.current)
+            lex.advance()
+          return newTokenTuple(lex, mtkFootnoteDef,
+                    lex.strbuf.strip(), wsno=wsno, attrs=some(@[footId]))
+        else:
+          # Footnote reference: [^id]
+          return newTokenTuple(lex, mtkFootnoteRef, "",
+                    wsno=wsno, attrs=some(@[footId]))
+    # Regular link or checkbox
     lex.advance()
     lex.strbuf.setLen(0)
     while lex.current != ']' and lex.current != '\0':
@@ -348,6 +416,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance(); lex.advance()
       return newTokenTuple(lex, mtkStrong, wsno=wsno)
     else:
+      lex.advance();
       return newTokenTuple(lex, mtkEmphasis, wsno=wsno)
   of ' ':
     # Line break (two or more spaces at end of line)
@@ -390,11 +459,10 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkTable, lex.strbuf, wsno=wsno)
   else:
     # Paragraph or plain text
-    lex.strbuf.setLen(0)
-    # Stop at markdown delimiters
-    while lex.current notin {'\n', '\r', '\0', '*', '_', '[', ']', '!', '`', '<'}:
-      lex.strbuf.add(lex.current)
-      lex.advance()
-    if lex.strbuf.len > 0:
-      return newTokenTuple(lex, mtkText, lex.strbuf, wsno=wsno)
+    # Scan for auto links anywhere in the text
+    let tokens = lex.scanTextWithLinks(wsno)
+    if tokens.len > 0:
+      if tokens.len > 1:
+        lex.pendingTokens = tokens[1..^1]
+      return tokens[0]
     return newTokenTuple(lex, mtkUnknown, wsno=wsno)

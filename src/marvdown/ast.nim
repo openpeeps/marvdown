@@ -27,6 +27,8 @@ type
     mdkHtml,           # Raw HTML content
     mdkTable,          # Table
     mdkParagraph,      # Paragraph
+    mdkFootnoteDef,    # Footnote definition
+    mdkFootnoteRef,    # Footnote reference
     mdkDocument,       # Root document node
     mdkUnknown         # Unknown or unsupported node
 
@@ -82,6 +84,12 @@ type
         ## Table rows
     of mdkUnknown:
       info*: string # For unknown or unsupported nodes
+    of mdkFootnoteRef:
+      footnoteRefId*: string
+        ## Identifier for the footnote reference
+    of mdkFootnoteDef:
+      footnoteId*: string
+        ## Identifier for the footnote definition
     else: discard
     children*: MarkdownNodeList
       ## Child nodes (for container nodes)
