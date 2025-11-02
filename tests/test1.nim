@@ -11,7 +11,8 @@ let opts = MarkdownOptions(
   allowTagsByType: tagNone,
   allowInlineStyle: false,
   allowHtmlAttributes: false,
-  enableAnchors: true
+  enableAnchors: true,
+  anchorIcon: "🔗"
 )
 test "headings with anchors":
   let sample = """

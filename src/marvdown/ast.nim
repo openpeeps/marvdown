@@ -4,7 +4,8 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/options
+import std/[options, json]
+import pkg/jsony
 
 from std/htmlparser import HtmlTag
 
@@ -97,3 +98,6 @@ type
       ## Line number in the source markdown
     wsno*: int
       ## Whitespace count before the token (for indentation)
+
+proc debugEcho*(n: MarkdownNode) =
+  echo toJson(n)
