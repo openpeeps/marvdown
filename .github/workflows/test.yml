@@ -35,9 +35,12 @@ jobs:
       - name: Install PCRE dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install pcre
-      - name: Install PCRE dependencies (Windows)
+
+      - name: Install OpenSSL (Windows)
         if: runner.os == 'Windows'
         run: choco install openssl
+
+      - name: Install PCRE dependencies (Windows)
         if: runner.os == 'Windows'
         run: choco install pcre
 
