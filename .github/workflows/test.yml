@@ -37,6 +37,7 @@ jobs:
         run: brew install pcre
       - name: Install PCRE dependencies (Windows)
         if: runner.os == 'Windows'
+        run: choco install openssl
         run: choco install pcre
       - run: nimble install -Y
       - run: nim c -r src/${{ github.event.repository.name }}.nim
