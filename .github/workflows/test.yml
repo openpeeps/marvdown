@@ -14,19 +14,31 @@ on:
       - .github/workflows
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         nim-version:
           - 'stable'
+        os:
+          - ubuntu-latest
+          - macOS-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v3
       - uses: jiro4989/setup-nim-action@v1
         with:
           nim-version: ${{ matrix.nim-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install PCRE dependencies
+      - name: Install PCRE dependencies (Ubuntu)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpcre3 libpcre3-dev
+      - name: Install PCRE dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pcre
+      - name: Install PCRE dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install pcre
       - run: nimble install -Y
       - run: nim c -r src/${{ github.event.repository.name }}.nim
       - run: nimble test
+
