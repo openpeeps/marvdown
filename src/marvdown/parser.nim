@@ -815,28 +815,44 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
         ("<", "&lt;"), (">", "&gt;"),
         ("\"", "&quot;"), ("&", "&amp;")
       )
-    let classAttr = if node.codeLang.len > 0: " class=\"language-" & node.codeLang & "\"" else: ""
-    result.add("<pre><code" & classAttr & ">" & codeBlock.strip() & "</code></pre>")
+    result.add(
+      pre(
+        code(
+          `class`=if node.codeLang.len > 0: "language-" & node.codeLang else: "",
+          codeBlock.strip()
+        )
+      )
+    )
   of mdkInlineCode:
     let inlineCode = node.inlineCode.multiReplace(
         ("<", "&lt;"), (">", "&gt;"),
         ("\"", "&quot;"), ("&", "&amp;")
       )
-    result = "<code>" & inlineCode & "</code>"
+    result = code(inlineCode)
   of mdkBlockquote:
     var bqContent = ""
     for child in node.children.items:
       bqContent.add(md.renderNode(child))
-    result = "<blockquote>" & bqContent & "</blockquote>"
+    result = blockquote(bqContent)
   of mdkFootnoteRef:
     # Footnote reference rendering
-    result = "<sup class=\"footnote-ref\"><a href=\"#fn-" & node.footnoteRefId & "\">" & node.footnoteRefId & "</a></sup>"
+    result = sup(
+      `class`="footnote-ref",
+      a(href="#fn-" & node.footnoteRefId, node.footnoteRefId)
+    )
   of mdkFootnoteDef:
     # Footnote definition rendering (could be customized)
     var fnContent = ""
     for child in node.children.items:
       fnContent.add(md.renderNode(child))
-    md.footnotesHtml.add("<div class=\"footnote\" id=\"fn-" & node.footnoteId & "\">" &
-             "<sup>" & node.footnoteId & "</sup> " & fnContent & "</div>")
+    md.footnotesHtml.add(
+      `div`(
+        `class`="footnote",
+        id="fn-" & node.footnoteId,
+        sup(node.footnoteId),
+        " ",
+        fnContent
+      )
+    )
   else:
     discard
