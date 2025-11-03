@@ -75,12 +75,30 @@ elif isMainModule:
         # show stats if `--bench` flag is set
         stdout.writeLine("🔥 Done in " & $benchTime & " sec")
 
+  proc jsonCommand(v: Values) =
+    ## Convert Markdown to JSON via CLI
+    if not v.has("md"):
+      display("Nothing to parse. Missing `.md` doc")
+      QuitFailure.quit
+
+    let
+      filePath = absolutePath(normalizedPath($(v.get("md").getPath)))
+      content = readFile(filePath)
+
+    var md = newMarkdown(content)
+
+    # output JSON to console
+    stdout.writeLine(md.toJson())
+
   # Kapsis CLI Application
   commands:
     html path(`md`), ?filename(`output`),
       bool(--optAnchors),
       bool(--bench):
         ## Write a markdown document to HTML
+    
+    json path(`md`):
+      ## Export the markdown AST as JSON
     
 else:
   # Use Marvdown as Nimble library
@@ -100,3 +118,8 @@ else:
     ## Convert Markdown content to XML Node
     var md = newMarkdown(content)
     htmlparser.parseHtml(md.toHtml())
+
+  proc getAst*(content: sink string): string =
+    ## Retrieve the Markdown AST as a stringified JSON
+    var md = newMarkdown(content)
+    md.toJson()

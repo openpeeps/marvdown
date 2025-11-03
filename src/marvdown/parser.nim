@@ -11,6 +11,7 @@ import htmlparser {.all.}
 export HtmlTag
 
 import ./lexer, ./ast
+import pkg/jsony
 
 type
   MarkdownParser* = object
@@ -199,14 +200,6 @@ proc parseCheckboxItem(md: var Markdown): MarkdownNode =
     for n in md.parseInline(itemText):
       result.children.items.add(n)
   md.advance()
-  
-  # If there's text after the checkbox, parse it as inline
-  # echo md.parser.curr
-  # if md.parser.curr.kind == mtkText and md.parser.curr.token.len > 0:
-  #   echo md.parser.curr.token
-  #   for n in md.parseInline(md.parser.curr.token.strip()):
-  #     result.children.items.add(n)
-  #   md.advance()
 
 proc parseEmphasis(md: var Markdown): MarkdownNode =
   # Parse emphasis text and add to current paragraph
@@ -691,6 +684,10 @@ proc toHtml*(md: var Markdown): string =
     add result, md.renderNode(node)
   if md.opts.showFootnotes and md.footnotesHtml.len > 0:
     add result, "<hr><div class=\"footnotes\">" & md.footnotesHtml & "</div>"
+
+proc toJson*(md: Markdown): string =
+  ## Convert the parsed Markdown AST to JSON
+  jsony.toJson(md.ast)
 
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
