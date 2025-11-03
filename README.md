@@ -13,10 +13,10 @@
 </p>
 
 > [!NOTE]  
-> Marv is still in early development. More features and improvements are coming soon.
+> Marv is still in early development. Some features are not fully implemented yet. Contributions are welcome!
 
 ## 😍 Key Features
-- [x] Extremely Fast & Lightweight
+- [x] Extremely Fast & Lightweight! [Check benchmarks](#benchmarks)
 - [x] Compiled CLI application
 - [x] Nim library for easy integration in your 👑 Nim projects
 - [x] Addon for Node.js JavaScript runtime via N-API
@@ -71,7 +71,15 @@ _todo: example of custom options_
 For more examples, see the [/examples folder](#). Also check out the [API reference](https://openpeeps.github.io/marvdown/) for more details 👌
 
 ### Benchmarks
-todo
+Marvdown is super fast! It can parse large markdown files in milliseconds. Here is a quick benchmark
+over 100K lines of markdown text (~5.3 MB)
+
+```
+Benchmark 1: marvdown html bigdoc.md
+  Time (abs ≡):        188.1 ms               [User: 166.9 ms, System: 19.8 ms]
+```
+
+_Benchmark made with [hyperfine](https://github.com/sharkdp/hyperfine)_
 
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/marvdown/issues)
