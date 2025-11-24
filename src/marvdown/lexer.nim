@@ -71,8 +71,14 @@ proc advance(lex: var MarkdownLexer) =
       inc lex.line
       lex.col = 0
       lex.wsno = 0
-    elif lex.current in {' ', '\t', '\r'}:
-      inc lex.wsno
+    elif lex.current in {' ', '\t'}:
+      # Only count indentation (wsno) when whitespace is at start of line.
+      if lex.col == 0:
+        inc lex.wsno
+      inc lex.col
+    elif lex.current == '\r':
+      # Treat CR similarly to other non-leading whitespace; do not
+      # increment wsno for it.
       inc lex.col
     else:
       lex.wsno = 0
@@ -138,8 +144,8 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   # Remove local wsno, use lex.wsno
   # Skip whitespace and newlines before token
   while true:
-    while lex.current in {' ', '\t', '\r'}:
-      lex.advance()
+    # Only normalize line endings and consume newlines; leave spaces/tabs
+    # so that they can be emitted as text tokens (preserve inline spaces).
     if lex.current == '\n':
       lex.col = 0
       lex.advance()
@@ -432,36 +438,79 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return newTokenTuple(lex, mtkEmphasis, wsno=lex.wsno)
   of ' ':
     # Line break (two or more spaces at end of line)
+    # Also accept tabs as whitespace that should be emitted as text tokens.
     if lex.peek() == ' ' and (lex.peek(2) == '\n' or lex.peek(2) == '\r'):
       lex.advance(); lex.advance();
       if lex.current in {'\n', '\r'}:
         lex.advance()
-      return newTokenTuple(lex, mtkLineBreak, wsno=lex.wsno)
+        return newTokenTuple(lex, mtkLineBreak, wsno=lex.wsno)
     else:
       var text = " "
       lex.advance()
       return newTokenTuple(lex, mtkText, text, wsno=lex.wsno)
+  of '\t':
+    # Treat tabs as text tokens similar to spaces.
+    var text = "\t"
+    lex.advance()
+    return newTokenTuple(lex, mtkText, text, wsno=lex.wsno)
   of '<':
-    # Raw HTML
+    # Raw HTML block: consume until matching closing tag (handles nesting)
     lex.strbuf.setLen(0)
     var tag: string
-    var stopTag = false
+    var stopTagName = false
+    # Parse opening tag and get tag name
+    let tagStart = lex.pos
     while true:
       case lex.current
       of '>', '\0': break
       of ' ':
-        stopTag = true
+        stopTagName = true
         lex.strbuf.add(lex.current)
       of 'a'..'z', 'A'..'Z', '0'..'9', '_', '-':
         lex.strbuf.add(lex.current)
-        if not stopTag: tag.add(lex.current)
+        if not stopTagName:
+          tag.add(lex.current)
       else:
         lex.strbuf.add(lex.current)
       lex.advance()
     if lex.current == '>':
       lex.strbuf.add(lex.current)
       lex.advance()
-    return newTokenTuple(lex, mtkHtml, lex.strbuf, wsno=lex.wsno, attrs=some(@[tag]))
+    # now consume until outermost closing tag
+    # TODO test for self-closing tags
+    var htmlContent = lex.strbuf
+    var depth = 1
+    while depth > 0 and lex.current != '\0':
+      if lex.current == '<':
+        if lex.peek() == '/':
+          # Possible closing tag
+          var closeTag = ""
+          var tempPos = lex.pos + 2
+          while tempPos < lex.input.len and lex.input[tempPos] in {'a'..'z', 'A'..'Z', '0'..'9', '_', '-'}:
+            closeTag.add(lex.input[tempPos])
+            inc tempPos
+          if closeTag == tag:
+            depth -= 1
+          # Add chars to htmlContent until '>'
+          while lex.current != '>' and lex.current != '\0':
+            htmlContent.add(lex.current)
+            lex.advance()
+          if lex.current == '>':
+            htmlContent.add(lex.current)
+            lex.advance()
+          continue
+        else:
+          # Possible nested opening tag
+          var openTag = ""
+          var tempPos = lex.pos + 1
+          while tempPos < lex.input.len and lex.input[tempPos] in {'a'..'z', 'A'..'Z', '0'..'9', '_', '-'}:
+            openTag.add(lex.input[tempPos])
+            inc tempPos
+          if openTag == tag:
+            depth += 1
+      htmlContent.add(lex.current)
+      lex.advance()
+    return newTokenTuple(lex, mtkHtml, htmlContent, wsno=lex.wsno, attrs=some(@[tag]))
   of '|':
     # Table row
     lex.strbuf.setLen(0)

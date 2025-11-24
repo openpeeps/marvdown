@@ -88,9 +88,13 @@ proc slugify(input: string, lowercase = true, sep = "-"): string =
       if result.len > 0 and result[^1] != '-':
         result.add(sep)
     of Letters:
-      result.add if lowercase: c.toLowerAscii else: c
+      result.add if lowercase:
+        c.toLowerAscii else: c
     of Digits:
       result.add c
+    of '-':
+      if result.len > 0 and result[^1] != '-':
+        result.add('-')
     else: discard
 
 proc parseImage(md: var Markdown): MarkdownNode =
@@ -370,8 +374,10 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         line: strongLine,
         wsno: strongWsno
       )
+      node.wsno = curr.wsno
       if curr.kind == mtkStrong:
         curr = lex.nextToken()
+      else: discard # todo handle unclosed strong
     else:
       node = MarkdownNode(
         kind: mdkText,
@@ -578,10 +584,12 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       md.ast.add(headingNode)
       md.advance()
     of mtkHtml:
+      closeCurrentParagraph()
       let tag = curr.attrs.get()[0]
       let tagType = htmlparser.htmlTag(tag)
       if md.opts.allowed.len > 0:
         if not md.opts.allowed.contains(tagType):
+          # TODO handle disallowed tags (e.g., escape or ignore)
           withCurrentParagraph do:
             let textValue =
               curr.token.multiReplace(("<", "&lt;"), (">", "&gt;"))
@@ -764,16 +772,17 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
 
     if md.opts.enableAnchors:
       # if anchors are enabled, generate unique anchors
-      var anchor = slugify(parseHtml(innerContent).innerText)
+      let title = parseHtml(innerContent).innerText
+      var anchor = slugify(title)
       if md.selectorCounter.contains(anchor):
         # make unique anchors - e.g., "heading-2", "heading-3", etc.
         let count = md.selectorCounter[anchor] + 1
         md.selectorCounter[anchor] = count
         anchor.add("-" & $count)
-        md.selectors[anchor] = anchor
+        md.selectors[anchor] = title
       else: # first occurrence
         md.selectorCounter[anchor] = 1
-        md.selectors[anchor] = anchor
+        md.selectors[anchor] = title
       let anchorlink =
             a(href="#" & anchor, `class`="anchor-link",
                     md.opts.anchorIcon)
