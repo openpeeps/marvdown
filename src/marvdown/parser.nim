@@ -11,7 +11,7 @@ import htmlparser {.all.}
 export HtmlTag
 
 import ./lexer, ./ast
-import pkg/jsony
+import pkg/[jsony, nyml]
 
 type
   MarkdownParser* = object
@@ -32,6 +32,8 @@ type
       ## Internal: Counter for generating unique selectors
     ast*: seq[MarkdownNode]
       ## The abstract syntax tree (AST) of the parsed markdown document
+    headerYaml: JsonNode
+      ## Parsed YAML front matter as JsonNode
     footnotes: OrderedTableRef[string, MarkdownNode]
       ## Footnote definitions parsed from the document
     footnotesHtml*: string
@@ -655,6 +657,28 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       closeCurrentParagraph()
       let bqNode = md.parseBlockquote()
       md.ast.add(bqNode)
+    of mtkHorizontalRule:
+      closeCurrentParagraph()
+      md.ast.add(MarkdownNode(
+        kind: mdkHorizontalRule,
+        line: curr.line,
+        wsno: curr.wsno
+      ))
+      md.advance()
+    of mtkDocument:
+      try:
+        # Parse YAML front matter
+        # TODO test YAML parsing (https://github.com/openpeeps/nyml)
+        md.headerYaml = fromYaml(curr.token, JsonNode)
+      except YAMLException as e:
+        # On error, add a text node with the error message
+        md.ast.add(MarkdownNode(
+          kind: mdkText,
+          text: curr.token, # invalid YAML, just add as text
+          line: curr.line,
+          wsno: curr.wsno
+        ))
+      md.advance()
     of mtkFootnoteRef:
       withCurrentParagraph do:
         let id = curr.attrs.get()[0]
@@ -673,7 +697,6 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       md.advance()
     else:
       closeCurrentParagraph()
-      md.advance()
 
 proc newMarkdown*(content: sink string,
           opts: MarkdownOptions = defaultOptions): Markdown =
@@ -711,6 +734,10 @@ proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
 proc hasSelectors*(md: Markdown): bool =
   ## Check if there are any headline selectors (anchors) in the parsed Markdown
   md.selectors != nil and md.selectors.len > 0
+
+proc getHeader*(md: Markdown): JsonNode =
+  ## Get the parsed YAML front matter from the Markdown
+  md.headerYaml
 
 proc getFootnotes*(md: Markdown): OrderedTableRef[string, MarkdownNode] =
   ## Get the footnote definitions from the parsed Markdown
@@ -867,5 +894,7 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
         fnContent
       )
     )
+  of mdkHorizontalRule: result = "<hr>"
   else:
-    discard
+    echo node.kind
+    echo "Warning: Unhandled MarkdownNode kind in renderNode"

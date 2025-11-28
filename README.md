@@ -17,11 +17,11 @@
 
 ## 😍 Key Features
 - [x] Extremely Fast & Lightweight! [Check benchmarks](#benchmarks)
-- [x] Compiled CLI application
+- [x] Compiled cross-platform CLI app
 - [x] Nim library for easy integration in your 👑 Nim projects
 - [x] Addon for Node.js JavaScript runtime via N-API
 - [x] Markdown to HTML
-  - [ ] Auto-generate Table of Contents (ToC)
+  - [x] Auto-generate Table of Contents (ToC)
   - [x] Auto-generate heading IDs for anchor links
 - [ ] Markdown to PDF
 - [ ] Markdown to JSON (structured data)

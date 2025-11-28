@@ -15,6 +15,7 @@ requires "nim >= 2.0.0"
 requires "kapsis#head"
 requires "denim#head"
 requires "jsony#head"
+requires "nyml#head"
 
 task napi, "Build Marvdown as a Node.js addon using N-API":
   exec "denim build src/marvdown.nim --cmake -y"

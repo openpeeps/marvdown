@@ -197,8 +197,25 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
     
     if count >= 3 and (lex.current == '\n' or lex.current == '\0'):
-      # Horizontal rule
-      return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count), wsno=lex.wsno)
+      # Horizontal rule, or the begining of a YAML front matter
+      if lex.line == 1:
+        # YAML front matter detected
+        lex.strbuf.setLen(0)
+        while true:
+          if lex.current == '\0':
+            break
+          if lex.current == '-' and lex.peek() == '-' and lex.peek(2) == '-':
+            # End of front matter
+            lex.advance(); lex.advance(); lex.advance()
+            if lex.current in {'\n', '\r'}:
+              lex.advance()
+            break
+          lex.strbuf.add(lex.current)
+          lex.advance()
+        let frontMatter = lex.strbuf.strip()
+        return newTokenTuple(lex, mtkDocument, frontMatter, wsno=lex.wsno)
+      else:
+        return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count), wsno=lex.wsno)
 
     if (ch in {'-', '*', '+'}) and (lex.current == ' ' or lex.current == '\t'):
       # Unordered list item
