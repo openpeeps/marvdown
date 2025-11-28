@@ -24,7 +24,7 @@
   - [x] Auto-generate Table of Contents (ToC)
   - [x] Auto-generate heading IDs for anchor links
 - [ ] Markdown to PDF
-- [ ] Markdown to JSON (structured data)
+- [x] Markdown to JSON (structured data)
 - [ ] GitHub Flavored Markdown (GFM)
 
 ## About
