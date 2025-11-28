@@ -139,27 +139,30 @@ proc scanTextWithLinks(lex: var MarkdownLexer, wsno: int): seq[MarkdownTokenTupl
     tokens.add(newTokenTuple(lex, mtkText, buf, wsno=wsno))
   return tokens
 
+const newSpace = " "
 proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   ## Lex the next token from the input
   # Remove local wsno, use lex.wsno
   # Skip whitespace and newlines before token
-  while true:
-    # Only normalize line endings and consume newlines; leave spaces/tabs
-    # so that they can be emitted as text tokens (preserve inline spaces).
-    if lex.current == '\n':
-      lex.col = 0
-      lex.advance()
-      continue
-    elif lex.current == '\r':
-      if lex.peek() == '\n':
-        lex.advance()
-      inc lex.line
+  var newlineCount = 0
+  while lex.current == '\n' or lex.current == '\r':
+    # CRLF -> consume both as a single newline
+    if lex.current == '\r' and lex.peek() == '\n':
+      lex.advance() # consume '\r', now at '\n'
+    # consume the newline character
+    if lex.current == '\n' or lex.current == '\r':
+      inc newlineCount
       lex.col = 0
       lex.advance()
       continue
     break
-  # End of input
+  
+  if newlineCount > 2:
+    # More than 2 newlines -> paragraph break
+    return newTokenTuple(lex, mtkParagraph, wsno=lex.wsno)
+
   if lex.current == '\0':
+    # End of input
     return newTokenTuple(lex, mtkEOF, wsno=lex.wsno)
 
   # Return buffered tokens if present
@@ -445,9 +448,8 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         lex.advance()
         return newTokenTuple(lex, mtkLineBreak, wsno=lex.wsno)
     else:
-      var text = " "
       lex.advance()
-      return newTokenTuple(lex, mtkText, text, wsno=lex.wsno)
+      return newTokenTuple(lex, mtkText, newSpace, wsno=lex.wsno)
   of '\t':
     # Treat tabs as text tokens similar to spaces.
     var text = "\t"
@@ -512,16 +514,21 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
     return newTokenTuple(lex, mtkHtml, htmlContent, wsno=lex.wsno, attrs=some(@[tag]))
   of '|':
-    # Table row
-    lex.strbuf.setLen(0)
-    while lex.current notin {'\n', '\r', '\0'}:
-      lex.strbuf.add(lex.current)
+    if lex.col == 0 or lex.wsno > 0:
+      # table row
+      lex.strbuf.setLen(0)
+      while lex.current notin {'\n', '\r', '\0'}:
+        lex.strbuf.add(lex.current)
+        lex.advance()
+      return newTokenTuple(lex, mtkTable, lex.strbuf, wsno=lex.wsno)
+    else:
+      # treat as text
       lex.advance()
-    return newTokenTuple(lex, mtkTable, lex.strbuf, wsno=lex.wsno)
+      return newTokenTuple(lex, mtkText, "|", wsno=lex.wsno)
   else:
     # Paragraph or plain text
     # Scan for auto links anywhere in the text
-    let tokens = lex.scanTextWithLinks(lex.wsno)
+    let tokens = lex.scanTextWithLinks(lex.wsno) # This should be optional, no?
     if tokens.len > 0:
       if tokens.len > 1:
         lex.pendingTokens = tokens[1..^1]

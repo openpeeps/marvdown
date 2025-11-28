@@ -474,8 +474,8 @@ proc newParagraph*(curr: MarkdownTokenTuple): MarkdownNode =
   MarkdownNode(
     kind: mdkParagraph,
     children: MarkdownNodeList(),
-    line: 0,
-    wsno: 0
+    line: curr.line,
+    wsno: curr.wsno
   )
 
 template withCurrentParagraph(body: untyped): untyped =
@@ -535,15 +535,23 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     let curr = md.parser.curr
     case curr.kind
     of mtkText:
-      if currentParagraph.isNil:
-        currentParagraph = newParagraph(curr)
-      elif curr.col == 0:
-        if md.ast.len > 0 and curr.line - currentParagraph.line > 1:
-          # New paragraph after blank line
-          closeCurrentParagraph() # Flush existing paragraph
-          currentParagraph = newParagraph(curr)
-      let textNode = md.parseText()
-      currentParagraph.children.items.add(textNode)
+      withCurrentParagraph do:
+        let textNode = md.parseText()
+        currentParagraph.children.items.add(textNode)
+      md.advance()
+    of mtkLineBreak:
+      # Hard line break: add <br> inside the current paragraph
+      withCurrentParagraph do:
+        currentParagraph.children.items.add(MarkdownNode(
+          kind: mdkHtml,
+          html: "<br>",
+          line: curr.line,
+          wsno: curr.wsno
+        ))
+      md.advance()
+    of mtkParagraph:
+      # Blank line / paragraph separator: close current paragraph
+      closeCurrentParagraph()
       md.advance()
     of mtkImage:
       closeCurrentParagraph()
@@ -576,7 +584,6 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
         line: curr.line,
         wsno: curr.wsno
       )
-
       # parse inline content of the heading
       for n in md.parseInline(text):
         headingNode.children.items.add(n)
