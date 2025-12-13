@@ -1,4 +1,4 @@
-import unittest
+import unittest, options
 import marvdown
 
 let opts = MarkdownOptions(
@@ -8,7 +8,7 @@ let opts = MarkdownOptions(
     tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
     tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl
   ],
-  allowTagsByType: tagNone,
+  allowTagsByType: none(TagType),
   allowInlineStyle: false,
   allowHtmlAttributes: false,
   enableAnchors: true,

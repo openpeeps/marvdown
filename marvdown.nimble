@@ -13,7 +13,6 @@ installExt    = @["nim"]
 
 requires "nim >= 2.0.0"
 requires "kapsis#head"
-requires "denim#head"
 requires "jsony#head"
 requires "nyml#head"
 

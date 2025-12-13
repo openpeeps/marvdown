@@ -96,8 +96,38 @@ type
       ## Child nodes (for container nodes)
     line*: int
       ## Line number in the source markdown
-    wsno*: int
-      ## Whitespace count before the token (for indentation)
 
 proc debugEcho*(n: MarkdownNode) =
   echo toJson(n)
+
+proc newText*(text: string, ln: int): MarkdownNode =
+  result = MarkdownNode(kind: mdkText)
+  result.text = text
+  result.line = ln
+
+proc newImage*(alt, src, title: string, ln: int): MarkdownNode =
+  result = MarkdownNode(kind: mdkImage)
+  result.imageAlt = alt
+  result.imageSrc = src
+  result.imageTitle = title
+  result.line = ln
+
+proc newLink*(href, title: string, ln: int): MarkdownNode =
+  result = MarkdownNode(kind: mdkLink, children: MarkdownNodeList())
+  result.linkHref = href
+  result.linkTitle = title
+  result.line = ln
+
+proc newRawHtml*(html: string, ln: int): MarkdownNode =
+  result = MarkdownNode(kind: mdkHtml)
+  result.html = html
+  result.line = ln
+
+proc newHeading*(level: range[1..6], ln: int): MarkdownNode =
+  ## Create a new heading node
+  MarkdownNode(
+    kind: mdkHeading,
+    level: level,
+    children: MarkdownNodeList(),
+    line: ln
+  )

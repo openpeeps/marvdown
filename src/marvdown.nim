@@ -42,7 +42,7 @@ elif isMainModule:
         allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
           tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
           tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
-          tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl],
+          tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
         enableAnchors: v.has("--optAnchors")
       )
       t = cpuTime() # start timer after reading file
