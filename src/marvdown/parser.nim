@@ -708,6 +708,10 @@ proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
   md.selectors
 
+proc getSelectorsList*(md: Markdown): seq[string] =
+  ## Get a sequence of headline selector values from the parsed Markdown
+  md.selectors.values().toSeq()
+
 proc hasSelectors*(md: Markdown): bool =
   ## Check if there are any headline selectors (anchors) in the parsed Markdown
   md.selectors != nil and md.selectors.len > 0
