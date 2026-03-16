@@ -92,14 +92,15 @@ elif isMainModule:
     stdout.writeLine(md.toJson())
 
   # Kapsis CLI Application
-  commands:
-    html path(`md`), ?filename(`output`),
-      bool(--optAnchors),
-      bool(--bench):
-        ## Write a markdown document to HTML
-    
-    json path(`md`):
-      ## Export the markdown AST as JSON
+  initKapsis do:
+    commands:
+      html path(md), ?filename(output),
+        ?bool("--optAnchors"),
+        ?bool("--bench"):
+          ## Write a markdown document to HTML
+      
+      json path(md):
+        ## Export the markdown AST as JSON
     
 else:
   # Use Marvdown as Nimble library
