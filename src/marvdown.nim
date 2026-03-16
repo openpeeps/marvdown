@@ -20,7 +20,8 @@ elif isMainModule:
   import std/[os, strutils, times]
   
   import pkg/kapsis
-  import pkg/kapsis/[runtime, cli]
+  import pkg/kapsis/runtime
+  import pkg/kapsis/interactive/prompts
 
   import ./marvdown/parser
 
