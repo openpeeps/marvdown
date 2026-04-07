@@ -27,6 +27,9 @@ type
     mdkLineBreak,      # Line break
     mdkHtml,           # Raw HTML content
     mdkTable,          # Table
+    mdkTableHeader,    # Table header
+    mdkTableRow,       # Table row
+    mdkTableCell,      # Table cell
     mdkParagraph,      # Paragraph
     mdkFootnoteDef,    # Footnote definition
     mdkFootnoteRef,    # Footnote reference
@@ -78,11 +81,6 @@ type
     of mdkHtml:
       html*: string
         ## Raw HTML content
-    of mdkTable:
-      headers*: seq[string]
-        ## Table headers
-      rows*: seq[seq[string]]
-        ## Table rows
     of mdkUnknown:
       info*: string # For unknown or unsupported nodes
     of mdkFootnoteRef:

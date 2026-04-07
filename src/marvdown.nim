@@ -4,18 +4,34 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-when defined napibuild:
-  # Build a native NAPI addon using Denim
-  import pkg/denim
-  import ./marvdown/parser
+# Use Marvdown as Nimble library
+import std/[htmlparser, xmltree]
 
-  init proc(module: Module) =
-    proc toHtml(content: string) {.export_napi.} =
-      ## Convert Markdown content to HTML
-      var md = newMarkdown(args.get("content").getStr)
-      return %* toHtml(md)
+import ./marvdown/[parser, ast]
+export parser, ast
 
-elif isMainModule:
+export hasSelectors, getSelectors, getTitle
+
+proc toHtml*(content: sink string): owned string =
+  ## Convert Markdown content to HTML
+  var md = newMarkdown(content)
+  md.toHtml()
+
+proc toXML*(content: sink string): XmlNode =
+  ## Convert Markdown content to XML Node
+  var md = newMarkdown(content)
+  htmlparser.parseHtml(md.toHtml())
+
+proc toXML*(md: var Markdown): XmlNode =
+  ## Convert a Markdown object to XML Node
+  htmlparser.parseHtml(md.toHtml())
+
+proc getAst*(content: sink string): string =
+  ## Retrieve the Markdown AST as a stringified JSON
+  var md = newMarkdown(content)
+  md.toJson()
+
+when isMainModule:
   # Use Marvdown as standalone CLI application
   import std/[os, strutils, times]
   
@@ -61,7 +77,7 @@ elif isMainModule:
 
     if not hasOutputPath:
       # write to console if no output path is specified
-      stdout.writeLine(md.toHtml())
+      stdout.writeLine(md.toHTML())
       if showBench:
         # show stats if `--bench` flag is set
         stdout.writeLine("🔥 Done in " & $(cpuTime() - t) & " sec")
@@ -101,27 +117,3 @@ elif isMainModule:
       
       json path(md):
         ## Export the markdown AST as JSON
-    
-else:
-  # Use Marvdown as Nimble library
-  import std/[htmlparser, xmltree]
-
-  import ./marvdown/[parser, ast]
-  export parser, ast
-
-  export hasSelectors, getSelectors, getTitle
-
-  proc toHtml*(content: sink string): owned string =
-    ## Convert Markdown content to HTML
-    var md = newMarkdown(content)
-    md.toHtml()
-
-  proc toXML*(content: sink string): XmlNode =
-    ## Convert Markdown content to XML Node
-    var md = newMarkdown(content)
-    htmlparser.parseHtml(md.toHtml())
-
-  proc getAst*(content: sink string): string =
-    ## Retrieve the Markdown AST as a stringified JSON
-    var md = newMarkdown(content)
-    md.toJson()

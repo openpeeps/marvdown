@@ -70,8 +70,12 @@ type
 # forward declarations
 #
 proc renderNode(md: var Markdown, node: MarkdownNode): string
-proc parseInline(md: var Markdown, text: string): seq[MarkdownNode]
+
+proc parseInline(md: var Markdown, items: var seq[MarkdownNode])
+proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode]
+
 proc parseEmphasis(md: var Markdown): MarkdownNode
+proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode)
 
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
@@ -120,7 +124,7 @@ proc parseLink(md: var Markdown): MarkdownNode =
 
 proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
-  newText(md.parser.curr.token, md.parser.curr.line)
+  newText(md.parser.curr.token.strip(), md.parser.curr.line)
 
 proc parseStrong(md: var Markdown): MarkdownNode =
   # Parse strong text and add to current paragraph
@@ -170,7 +174,7 @@ proc parseStrong(md: var Markdown): MarkdownNode =
     )
 
 proc parseCheckboxItem(md: var Markdown): MarkdownNode =
-  ## Parse a checkbox list item ([ ] or [x])
+  # Parse a checkbox list item ([ ] or [x])
   let attrs = md.parser.curr.attrs.get()
   let checked = attrs.len > 1 and attrs[1] == "checked"
   result = MarkdownNode(
@@ -189,7 +193,7 @@ proc parseCheckboxItem(md: var Markdown): MarkdownNode =
   if itemText.len > 0:
     for n in md.parseInline(itemText):
       result.children.items.add(n)
-  md.advance()
+  md.advance() # consume the checkbox item token
 
 proc parseEmphasis(md: var Markdown): MarkdownNode =
   # Parse emphasis text and add to current paragraph
@@ -212,12 +216,59 @@ proc parseEmphasis(md: var Markdown): MarkdownNode =
     result = MarkdownNode(kind: mdkText, line: tk.line)
     result.text = "*" & str
 
-proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
+proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
+  # Parse inline nodes from the current parser stream.
+  # Consumes tokens until a block boundary / paragraph boundary
+  const stopKinds = {
+    mtkEOF, mtkParagraph, mtkHeading, mtkTable,
+    mtkListItem, mtkListItemCheckbox, mtkOListItem,
+    mtkCodeBlock, mtkBlockquote, mtkHorizontalRule,
+    mtkDocument, mtkFootnoteDef
+  }
+
+  while md.parser.curr.kind notin stopKinds:
+    let curr = md.parser.curr
+    var node: MarkdownNode
+    case curr.kind
+    of mtkText:
+      node = md.parseText()
+      md.advance()
+    of mtkEmphasis:
+      node = md.parseEmphasis()
+    of mtkStrong:
+      node = md.parseStrong()
+    of mtkLink:
+      node = md.parseLink()
+      md.advance()
+    of mtkImage:
+      node = md.parseImage()
+      md.advance()
+    of mtkInlineCode:
+      node = MarkdownNode(
+        kind: mdkInlineCode,
+        inlineCode: curr.token,
+        line: curr.line
+      )
+      md.advance()
+    of mtkFootnoteRef:
+      let id = curr.attrs.get()[0]
+      node = MarkdownNode(
+        kind: mdkFootnoteRef,
+        footnoteRefId: id,
+        line: curr.line
+      )
+      md.advance()
+    of mtkLineBreak:
+      node = newRawHtml("<br>", curr.line)
+      md.advance()
+    else: break
+    if node != nil: items.add(node)
+
+proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
   var lex = initLexer(text)
   var curr = lex.nextToken()
   let ln = curr.line
-  while curr.kind != mtkEOF:
-    if curr.line != ln: break
+  while curr.kind != mtkEOF and curr.line == ln:
     var node: MarkdownNode
     case curr.kind
     of mtkText:
@@ -235,63 +286,6 @@ proc parseInline(md: var Markdown, text: string): seq[MarkdownNode] =
         if curr.kind == mtkEOF: break
         str.add(curr.token)
         curr = lex.nextToken()
-      # if next.kind == mtkText:
-      #   let after = lex.nextToken()
-      #   if after.kind == mtkEmphasis:
-      #     node = MarkdownNode(
-      #       kind: mdkEmphasis,
-      #       children: MarkdownNodeList(items: @[MarkdownNode(
-      #         kind: mdkText,
-      #         text: next.token,
-      #         line: next.line,
-      #         wsno: next.wsno
-      #       )]),
-      #       line: curr.line,
-      #       wsno: curr.wsno
-      #     )
-      #     curr = lex.nextToken()
-      #   else:
-      #     node = MarkdownNode(
-      #       kind: mdkText,
-      #       text: text[startCol-1 ..< text.len],
-      #       line: curr.line,
-      #       wsno: curr.wsno
-      #     )
-      #     curr = after
-      # else:
-      #   node = MarkdownNode(
-      #     kind: mdkText,
-      #     text: text[startCol-1 ..< text.len],
-      #     line: curr.line,
-      #     wsno: curr.wsno
-      #   )
-      #   curr = next
-    of mtkLink:
-      # Parse link inline
-      if curr.attrs.isSome and curr.attrs.get().len >= 2:
-        let textVal = curr.attrs.get()[0]
-        let hrefVal = curr.attrs.get()[1]
-        let titleVal =
-          if curr.attrs.get().len > 2:
-            curr.attrs.get()[2]
-          else: "" # no title
-
-        let textNode = MarkdownNode(
-          kind: mdkText,
-          text: textVal,
-          line: curr.line
-        )
-        let linkNode = MarkdownNode(
-          kind: mdkLink,
-          linkHref: hrefVal,
-          linkTitle: titleVal,
-          children: MarkdownNodeList(),
-          line: curr.line
-        )
-        for n in md.parseInline(textVal):
-          linkNode.children.items.add(n)
-        result.add(linkNode)
-      curr = lex.nextToken()
     of mtkImage:
       # Parse image inline
       if curr.attrs.isSome and curr.attrs.get().len >= 2:
@@ -418,28 +412,88 @@ proc parseList(md: var Markdown): MarkdownNode =
     result.children.items.add(itemNode)
 
 proc parseBlockquote(md: var Markdown): MarkdownNode =
-  ## Parse one or more consecutive blockquote tokens into a blockquote node
+  # Parse one or more consecutive blockquote tokens into a blockquote node
   let startIndent = 0
   result = MarkdownNode(
     kind: mdkBlockquote,
     children: MarkdownNodeList(items: @[]),
     line: md.parser.curr.line
   )
-  while md.parser.curr.kind == mtkBlockquote and startIndent == 0:
-    let quoteText = md.parser.curr.token.strip()
-    # Parse inline content of the blockquote
-    for n in md.parseInline(quoteText):
-      result.children.items.add(n)
-    md.advance()
-    # Handle nested blockquotes ("> > ...")
-    if md.parser.curr.kind == mtkBlockquote and 0 > startIndent:
-      let nested = md.parseBlockquote()
-      result.children.items.add(nested)
+  # while md.parser.curr.kind == mtkBlockquote and startIndent == 0:
+  #   let quoteText = md.parser.curr.token.strip()
+  #   # Parse inline content of the blockquote
+  #   for n in md.parseInline(quoteText):
+  #     result.children.items.add(n)
+  #   md.advance()
+  #   # Handle nested blockquotes ("> > ...")
+  #   if md.parser.curr.kind == mtkBlockquote and 0 > startIndent:
+  #     let nested = md.parseBlockquote()
+  #     result.children.items.add(nested)
+
+proc parsePipeRow(md: var Markdown): MarkdownNode =
+  # Parse one pipe-delimited row. Expects curr.kind == mtkTable at row start.
+  let rowLine = md.parser.curr.line
+  result = MarkdownNode(
+    kind: mdkTableRow,
+    children: MarkdownNodeList(items: @[]),
+    line: rowLine
+  )
+
+  var cell: seq[MarkdownNode]
+  md.advance() # consume first '|'
+  while md.parser.curr.kind != mtkEOF and md.parser.curr.line == rowLine:
+    if md.parser.curr.kind == mtkTable:
+      # End of cell, let's start parse the cell content and add to result
+      result.children.items.add(MarkdownNode(
+        kind: mdkTableCell,
+        children: MarkdownNodeList(items: cell),
+        line: rowLine
+      ))
+      setLen(cell, 0)
+      md.advance() # consume '|'
+    else:
+      md.parseInline(cell)
+  
+
+proc parseTable(md: var Markdown, currentParagraph: var MarkdownNode): MarkdownNode =
+  # Parse a table starting with the header row
+  # Header row
+  let headerParsed = md.parsePipeRow()
+  var headerRow = MarkdownNode(
+    kind: mdkTableHeader,
+    children: headerParsed.children,
+    line: headerParsed.line
+  )
+
+  # Optional separator row: consume whole line if it looks like ---|---|---
+  # todo support alignment indicators like :---, ---:, :---:
+  # https://www.markdownguide.org/extended-syntax/#alignment
+  if md.parser.curr.kind == mtkTable:
+    let sepLine = md.parser.curr.line
+    var sepText: string
+    while md.parser.curr.kind != mtkEOF and md.parser.curr.line == sepLine:
+      if md.parser.curr.kind != mtkTable:
+        sepText.add(md.parser.curr.token)
+      md.advance()
+    if not sepText.contains("-"):
+      # not a separator; nothing to do (already consumed as normal row text line)
+      discard
+
+  result = MarkdownNode(
+    kind: mdkTable,
+    children: MarkdownNodeList(items: @[headerRow]),
+    line: headerRow.line
+  )
+
+  # Body rows in source order
+  while md.parser.curr.kind == mtkTable:
+    let row = md.parsePipeRow()
+    if row.children.items.len > 0:
+      result.children.items.add(row)
 
 #
 # Init Marvdown with content and options
 #
-
 proc newParagraph*(curr: MarkdownTokenTuple): MarkdownNode =
   ## Create a new empty paragraph node
   MarkdownNode(
@@ -491,8 +545,8 @@ proc parseFootnoteDef(md: var Markdown): MarkdownNode =
     line: md.parser.curr.line
   )
   # Parse inline content of the footnote definition
-  for n in md.parseInline(content):
-    result.children.items.add(n)
+  # for n in md.parseInline(content):
+  #   result.children.items.add(n)
   
   # Store the footnote definition in the Markdown instance
   if md.footnotes.isNil:
@@ -500,6 +554,7 @@ proc parseFootnoteDef(md: var Markdown): MarkdownNode =
   md.footnotes[id] = result
 
 proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
+  # Main parsing loop: iterate through tokens and build the AST
   while md.parser.curr.kind != mtkEOF:
     let curr = md.parser.curr
     case curr.kind
@@ -554,9 +609,15 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       # parse inline content of the heading
       for n in md.parseInline(text):
         headingNode.children.items.add(n)
-
       md.ast.add(headingNode)
       md.advance()
+    #
+    # Tables
+    # 
+    of mtkTable:
+      closeCurrentParagraph()
+      let tableNode = md.parseTable(currentParagraph)
+      md.ast.add(tableNode)
     #
     # Media elements
     #
@@ -858,6 +919,35 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     for child in node.children.items:
       bqContent.add(md.renderNode(child))
     result = blockquote(bqContent)
+  of mdkTable:
+    var html = "<table>"
+    var startIdx = 0
+    if node.children.items.len > 0 and node.children.items[0].kind == mdkTableHeader:
+      html.add(md.renderNode(node.children.items[0]))
+      startIdx = 1
+    html.add("<tbody>")
+    for i in startIdx ..< node.children.items.len:
+      html.add(md.renderNode(node.children.items[i]))
+    html.add("</tbody></table>")
+    result = html
+  of mdkTableHeader:
+    var html = "<thead><tr>"
+    for cell in node.children.items:
+      html.add(md.renderNode(cell))
+    html.add("</tr></thead>")
+    result = html
+  of mdkTableRow:
+    var html = "<tr>"
+    for cell in node.children.items:
+      html.add(md.renderNode(cell))
+    html.add("</tr>")
+    result = html
+  of mdkTableCell:
+    var html = "<td>"
+    for child in node.children.items:
+      html.add(md.renderNode(child))
+    html.add("</td>")
+    result = html    
   of mdkFootnoteRef:
     # Footnote reference rendering
     result = sup(

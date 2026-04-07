@@ -108,6 +108,11 @@ proc handleAutoLink(lex: var MarkdownLexer): MarkdownTokenTuple =
     lex.advance()
   return newTokenTuple(lex, mtkLink, attrs=some(@[tempStrBuf, tempStrBuf]))
 
+proc skipWhitespace(lex: var MarkdownLexer) =
+  while lex.current in {' ', '\t'}:
+    lex.advance()
+    inc lex.col
+
 const newSpace = " "
 proc scanTextWithLinks(lex: var MarkdownLexer): seq[MarkdownTokenTuple] =
   var buf = ""
@@ -136,8 +141,8 @@ proc scanTextWithLinks(lex: var MarkdownLexer): seq[MarkdownTokenTuple] =
       buf.add(' ')
       lex.advance()
       continue
-    if lex.current in {'\0', '*', '_', '[', ']', '!', '`', '<'}:
-      break
+    if lex.current in {'\0', '*', '_', '[', ']', '!', '`', '<', '|'}:
+      break # stop at special characters that may start a new token
     buf.add(lex.current)
     lex.advance()
   if buf.len > 0:
@@ -164,15 +169,17 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     # adding a paragraph token for multiple newlines
     return newTokenTuple(lex, mtkParagraph)
 
-  if lex.current == '\0':
-    # End of input
-    return newTokenTuple(lex, mtkEOF)
-
-  # Return buffered tokens if present
+  # Return pending tokens from text scanning if available,
+  # this must be checked before looking for new tokens or EOF,
+  # otherwise we might miss auto-link tokens that are generated from text scanning.
   if lex.pendingTokens.len > 0:
     let tok = lex.pendingTokens[0]
     lex.pendingTokens = lex.pendingTokens[1..^1]
     return tok
+
+  if lex.current == '\0':
+    # End of input
+    return newTokenTuple(lex, mtkEOF)
 
   case lex.current
   of '#':
@@ -223,13 +230,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     if (ch in {'-', '*', '+'}) and (lex.current == ' ' or lex.current == '\t'):
       # Unordered list item
       lex.advance()
-      while lex.current == ' ' or lex.current == '\t':
-        lex.advance()
-      
-      # Check for checkbox pattern
-      while lex.current == ' ' or lex.current == '\t':
-        lex.advance()
-
+      skipWhitespace(lex)
       if lex.current == '[' and (lex.peek() == 'x' or lex.peek() == ' '):
         lex.advance() # skip '['
         let cbChar = lex.current
@@ -532,17 +533,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
     return newTokenTuple(lex, mtkHtml, htmlContent, attrs=some(@[tag]))
   of '|':
-    if lex.col == 0:
-      # table row
-      lex.strbuf.setLen(0)
-      while lex.current notin {'\n', '\r', '\0'}:
-        lex.strbuf.add(lex.current)
-        lex.advance()
-      return newTokenTuple(lex, mtkTable, lex.strbuf)
-    else:
-      # treat as text
-      lex.advance()
-      return newTokenTuple(lex, mtkText, "|")
+    lex.advance()
+    skipWhitespace(lex) # skip spaces after '|'
+    return newTokenTuple(lex, mtkTable, "|")
   else:
     # Paragraph or plain text
     # Scan for auto links anywhere in the text
