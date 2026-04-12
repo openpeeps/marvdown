@@ -65,6 +65,8 @@ type
       ## Icon used for anchor links in headings
     showFootnotes*: bool = true
       ## Insert footnotes HTML at the end of the document (default: true)
+    htmlTableClasses*: Option[seq[string]]
+      ## Optional CSS classes to add to generated HTML tables (e.g., `["table", "table-striped"]` for Bootstrap tables)
 
 #
 # forward declarations
@@ -124,7 +126,7 @@ proc parseLink(md: var Markdown): MarkdownNode =
 
 proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
-  newText(md.parser.curr.token.strip(), md.parser.curr.line)
+  newText(md.parser.curr.token, md.parser.curr.line)
 
 proc parseStrong(md: var Markdown): MarkdownNode =
   # Parse strong text and add to current paragraph
@@ -348,6 +350,32 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
       if curr.kind == mtkStrong:
         curr = lex.nextToken()
       else: discard # todo handle unclosed strong
+    of mtkLink:
+      # Parse link inline
+      if curr.attrs.isSome and curr.attrs.get().len >= 2:
+        let textVal = curr.attrs.get()[0]
+        let hrefVal = curr.attrs.get()[1]
+        let titleVal =
+          if curr.attrs.get().len > 2:
+            curr.attrs.get()[2]
+          else: "" # no title
+
+        let textNode = MarkdownNode(
+          kind: mdkText,
+          text: textVal,
+          line: curr.line
+        )
+        let linkNode = MarkdownNode(
+          kind: mdkLink,
+          linkHref: hrefVal,
+          linkTitle: titleVal,
+          children: MarkdownNodeList(),
+          line: curr.line
+        )
+        for n in md.parseInline(textVal):
+          linkNode.children.items.add(n)
+        result.add(linkNode)
+      curr = lex.nextToken()
     else:
       node = MarkdownNode(
         kind: mdkText,
@@ -920,7 +948,11 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
       bqContent.add(md.renderNode(child))
     result = blockquote(bqContent)
   of mdkTable:
-    var html = "<table>"
+    var html: string
+    if md.opts.htmlTableClasses.isSome:
+      html = "<table class=\"" & md.opts.htmlTableClasses.get().join(" ") & "\">"
+    else:
+      html = "<table>"
     var startIdx = 0
     if node.children.items.len > 0 and node.children.items[0].kind == mdkTableHeader:
       html.add(md.renderNode(node.children.items[0]))
