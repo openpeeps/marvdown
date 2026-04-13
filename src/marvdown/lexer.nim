@@ -150,14 +150,21 @@ proc scanTextWithLinks(lex: var MarkdownLexer): seq[MarkdownTokenTuple] =
 
 proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   ## Lex the next token from the input
-  # Remove local wsno, use lex.wsno
-  # Skip whitespace and newlines before token
+
+  # Return pending tokens from text scanning if available,
+  # this must be checked before looking for new tokens or EOF,
+  # otherwise we might miss auto-link tokens that are generated from text scanning.
+
+  if lex.pendingTokens.len > 0:
+    let tok = lex.pendingTokens[0]
+    lex.pendingTokens = lex.pendingTokens[1..^1]
+    return tok
+
+  # Skip newlines and detect paragraph breaks
   var newlineCount = 0
   while lex.current == '\n' or lex.current == '\r':
-    # CRLF -> consume both as a single newline
     if lex.current == '\r' and lex.peek() == '\n':
-      lex.advance() # consume '\r', now at '\n'
-    # consume the newline character
+      lex.advance()
     if lex.current == '\n' or lex.current == '\r':
       inc newlineCount
       lex.col = 0
@@ -166,16 +173,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     break
 
   if newlineCount >= 2:
-    # adding a paragraph token for multiple newlines
     return newTokenTuple(lex, mtkParagraph)
-
-  # Return pending tokens from text scanning if available,
-  # this must be checked before looking for new tokens or EOF,
-  # otherwise we might miss auto-link tokens that are generated from text scanning.
-  if lex.pendingTokens.len > 0:
-    let tok = lex.pendingTokens[0]
-    lex.pendingTokens = lex.pendingTokens[1..^1]
-    return tok
 
   if lex.current == '\0':
     # End of input
