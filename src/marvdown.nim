@@ -31,7 +31,28 @@ proc getAst*(content: sink string): string =
   var md = newMarkdown(content)
   md.toJson()
 
-when isMainModule:
+when defined napi_build:
+  # Building Marvdown as a NAPI module
+  # This allows Marvdown to be used in Node.js/Bun.js applications 
+  import pkg/denim
+
+  init proc(module: Module) =
+    # Register and export functions using `export_napi` pragma
+    proc initMarkdown(): napi_value {.export_napi.} =
+      ## Initialize Marvdown (if needed)
+      
+      
+    proc toHtml(content: string): napi_value {.export_napi.} =
+      ## Convert Markdown to HTML via NAPI
+      var md = newMarkdown(args.get("content").getStr)
+      return %*(md.toHtml())
+
+    proc getAst(content: string): napi_value {.export_napi.} =
+      ## Retrieve the Markdown AST as a JSON object
+      var md = newMarkdown(args.get("content").getStr)
+      return %*(md.toJson())
+
+elif isMainModule:
   # Use Marvdown as standalone CLI application
   import std/[os, strutils, times]
   
