@@ -7,11 +7,12 @@
 import std/[strutils, sequtils, options,
         tables, unidecode, json, xmltree]
 
+import pkg/[nyml, openparser/json]
+
 import htmlparser {.all.}
 export HtmlTag
 
 import ./lexer, ./ast
-import pkg/[jsony, nyml]
 
 type
   MarkdownParser* = object
@@ -358,7 +359,7 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
         let titleVal =
           if curr.attrs.get().len > 2:
             curr.attrs.get()[2]
-          else: "" # no title
+          else: "" # no title provided
 
         let textNode = MarkdownNode(
           kind: mdkText,
@@ -791,7 +792,7 @@ proc toHtml*(md: var Markdown): string =
 
 proc toJson*(md: Markdown): string =
   ## Convert the parsed Markdown AST to JSON
-  jsony.toJson(md.ast)
+  toJson(md.ast)
 
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
