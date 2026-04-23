@@ -45,6 +45,8 @@ jobs:
       # - name: Install PCRE dependencies (Windows)
       #   if: runner.os == 'Windows'
       #   run: choco install pcre
+      - name: "Install kapsis for CLI app"
+        run: nimble install kapsis@#head
 
       - run: nimble install -Y
       - run: nim c -r src/${{ github.event.repository.name }}.nim

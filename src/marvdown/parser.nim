@@ -7,7 +7,7 @@
 import std/[strutils, sequtils, options,
         tables, unidecode, json, xmltree]
 
-import pkg/[nyml, openparser/json]
+import pkg/openparser/[json, yaml]
 
 import htmlparser {.all.}
 export HtmlTag
@@ -33,7 +33,7 @@ type
       ## Internal: Counter for generating unique selectors
     ast*: seq[MarkdownNode]
       ## The abstract syntax tree (AST) of the parsed markdown document
-    headerYaml: JsonNode
+    headerYaml: YAMLObject
       ## Parsed YAML front matter as JsonNode
     footnotes: OrderedTableRef[string, MarkdownNode]
       ## Footnote definitions parsed from the document
@@ -442,22 +442,18 @@ proc parseList(md: var Markdown): MarkdownNode =
 
 proc parseBlockquote(md: var Markdown): MarkdownNode =
   # Parse one or more consecutive blockquote tokens into a blockquote node
-  let startIndent = 0
   result = MarkdownNode(
     kind: mdkBlockquote,
     children: MarkdownNodeList(items: @[]),
     line: md.parser.curr.line
   )
-  # while md.parser.curr.kind == mtkBlockquote and startIndent == 0:
-  #   let quoteText = md.parser.curr.token.strip()
-  #   # Parse inline content of the blockquote
-  #   for n in md.parseInline(quoteText):
-  #     result.children.items.add(n)
-  #   md.advance()
-  #   # Handle nested blockquotes ("> > ...")
-  #   if md.parser.curr.kind == mtkBlockquote and 0 > startIndent:
-  #     let nested = md.parseBlockquote()
-  #     result.children.items.add(nested)
+  # Collect all consecutive blockquote lines as inline content
+  while md.parser.curr.kind == mtkBlockquote:
+    let quoteText = md.parser.curr.token.strip()
+    if quoteText.len > 0:
+      for n in md.parseInline(quoteText):
+        result.children.items.add(n)
+    md.advance()
 
 proc parsePipeRow(md: var Markdown): MarkdownNode =
   # Parse one pipe-delimited row. Expects curr.kind == mtkTable at row start.
@@ -735,9 +731,8 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     of mtkDocument:
       try:
         # Parse YAML front matter
-        # TODO test YAML parsing (https://github.com/openpeeps/nyml)
-        md.headerYaml = fromYaml(curr.token, JsonNode)
-      except YAMLException as e:
+        md.headerYaml = parseYAML(curr.token)
+      except OpenParserYamlError as e:
         # On error, add a text node with the error message
         md.ast.add(MarkdownNode(
           kind: mdkText,
@@ -806,7 +801,7 @@ proc hasSelectors*(md: Markdown): bool =
   ## Check if there are any headline selectors (anchors) in the parsed Markdown
   md.selectors != nil and md.selectors.len > 0
 
-proc getHeader*(md: Markdown): JsonNode =
+proc getHeader*(md: Markdown): YAMLObject =
   ## Get the parsed YAML front matter from the Markdown
   md.headerYaml
 

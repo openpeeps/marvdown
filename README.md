@@ -36,7 +36,6 @@ Install Marvdown via [Nimble](https://nim-lang.org/docs/nimble.html)
 nimble install marvdown
 ```
 
-
 ## Example Usage
 Using Marvdown from the command line is super easy. Just run:
 ```
@@ -44,16 +43,51 @@ marvdown html sample.md --optAnchors --bench
 ```
 Enable anchor generations for headings with `--optAnchors` flag. Run benchmarks with `--bench` flag.
 
-### Programming with Marvdown
-
-In Nim language the fastest way to convert markdown to HTML is to use the `toHtml()` proc.
+## Marvdown as a Markdown library
+Import Marvdown in your Nim project and use it to convert markdown contents:
 ```nim
 import marvdown
 
 echo marvdown.toHtml(readFile("sample.md"))
 ```
 
-_todo: example of custom options_
+A full example of using Marvdown as a library with custom options:
+```nim
+import marvdown
+
+let opts = MarkdownOptions(
+  allowed: @[
+    tagA, tagAbbr, tagB, tagBlockquote, tagBr,
+    tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
+    tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
+    tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl
+  ],
+  allowTagsByType: none(TagType),
+  allowInlineStyle: false,
+  allowHtmlAttributes: false,
+  enableAnchors: true,
+  anchorIcon: "🔗"
+)
+
+# Convert markdown to HTML with custom options
+echo marvdown.toHtml("...", opts)
+```
+
+### Marvdown to XML
+Marvdown also provides an XML output format, which can be useful for certain applications that require structured data. You can convert markdown to XML like this:
+```nim
+import marvdown
+
+echo marvdown.toXml(readFile("sample.md"))
+```
+
+### Marvdown AST
+Marvdown also provides an Abstract Syntax Tree (AST) representation of the parsed markdown content. This is useful for advanced use cases, or storing the structured data in a database for later rendering (avoid storing raw HTML in the database). You can access the AST like this:
+```nim
+import marvdown
+
+echo marvdown.getAst(readFile("sample.md"))
+```
 
 For more examples, see the [/examples folder](#). Also check out the [API reference](https://openpeeps.github.io/marvdown/) for more details 👌
 

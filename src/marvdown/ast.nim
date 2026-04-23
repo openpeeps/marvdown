@@ -5,7 +5,7 @@
 #          https://github.com/openpeeps/marvdown
 
 import std/[options, json]
-import pkg/jsony
+import pkg/openparser/json
 
 from std/htmlparser import HtmlTag
 
