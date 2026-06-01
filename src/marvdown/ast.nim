@@ -4,10 +4,8 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[options, json]
-import pkg/openparser/json
-
-from std/htmlparser import HtmlTag
+import std/options
+import pkg/openparser/[json, html]
 
 type
   MarkdownNodeKind* = enum

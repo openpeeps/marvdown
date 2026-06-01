@@ -4,12 +4,9 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[strutils, sequtils, options,
-        tables, unidecode, json, xmltree]
+import std/[strutils, sequtils, options, tables, unidecode]
+import pkg/openparser/[json, yaml, html]
 
-import pkg/openparser/[json, yaml]
-
-import htmlparser {.all.}
 export HtmlTag
 
 import ./lexer, ./ast
@@ -20,7 +17,7 @@ type
     lexer: MarkdownLexer
     prev, curr, next: MarkdownTokenTuple
 
-  Markdown* = ref object
+  Markdown* {.acyclic.} = ref object
     parser: MarkdownParser
       ## Internal: The markdown parser instance
     minify*: bool
@@ -219,15 +216,21 @@ proc parseEmphasis(md: var Markdown): MarkdownNode =
     result = MarkdownNode(kind: mdkText, line: tk.line)
     result.text = "*" & str
 
+const stopKinds = {
+  mtkEOF, mtkParagraph, mtkHeading, mtkTable,
+  mtkListItem, mtkListItemCheckbox, mtkOListItem,
+  mtkCodeBlock, mtkBlockquote, mtkHorizontalRule,
+  mtkDocument, mtkFootnoteDef
+}
+
+const inlineKinds = {
+  mtkStrong, mtkEmphasis, mtkLink, mtkImage,
+  mtkInlineCode, mtkFootnoteRef, mtkLineBreak
+}
+
 proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
   # Parse inline nodes from the current parser stream.
   # Consumes tokens until a block boundary / paragraph boundary
-  const stopKinds = {
-    mtkEOF, mtkParagraph, mtkHeading, mtkTable,
-    mtkListItem, mtkListItemCheckbox, mtkOListItem,
-    mtkCodeBlock, mtkBlockquote, mtkHorizontalRule,
-    mtkDocument, mtkFootnoteDef
-  }
 
   while md.parser.curr.kind notin stopKinds:
     let curr = md.parser.curr
@@ -236,6 +239,10 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
     of mtkText:
       node = md.parseText()
       md.advance()
+      # Preserve word boundary: append a space when text is directly
+      # followed by an inline element (lexer strips the whitespace).
+      if md.parser.curr.kind in inlineKinds:
+        node.text.add(' ')
     of mtkEmphasis:
       node = md.parseEmphasis()
     of mtkStrong:
@@ -282,12 +289,23 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
       )
       curr = lex.nextToken()
     of mtkEmphasis:
-      let startCol = curr.col
+      let emphLine = curr.line
       curr = lex.nextToken()
-      var str = "*"
-      while curr.kind != mtkEmphasis and curr.line == ln:
-        if curr.kind == mtkEOF: break
-        str.add(curr.token)
+      var emphChildren: seq[MarkdownNode] = @[]
+      while curr.kind != mtkEmphasis and curr.kind != mtkEOF:
+        if curr.kind == mtkText:
+          emphChildren.add(MarkdownNode(
+            kind: mdkText,
+            text: curr.token,
+            line: curr.line
+          ))
+        curr = lex.nextToken()
+      node = MarkdownNode(
+        kind: mdkEmphasis,
+        children: MarkdownNodeList(items: emphChildren),
+        line: emphLine
+      )
+      if curr.kind == mtkEmphasis:
         curr = lex.nextToken()
     of mtkImage:
       # Parse image inline
@@ -657,7 +675,7 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     of mtkHtml:
       closeCurrentParagraph()
       let tag = curr.attrs.get()[0]
-      let tagType = htmlparser.htmlTag(tag)
+      let tagType = html.getHtmlTag(tag)
       if md.opts.allowed.len > 0:
         if not md.opts.allowed.contains(tagType):
           # TODO handle disallowed tags (e.g., escape or ignore)
@@ -761,7 +779,8 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     else:
       closeCurrentParagraph()
 
-proc newMarkdown*(content: sink string, opts: MarkdownOptions = defaultOptions): Markdown =
+proc newMarkdown*(content: sink string,
+              opts: MarkdownOptions = defaultOptions): Markdown =
   ## Create a new Markdown instance
   var md = Markdown(
     parser: MarkdownParser(lexer: initLexer(content)),
