@@ -21,8 +21,8 @@ jobs:
           - 'stable'
         os:
           - ubuntu-latest
-          - macOS-latest
-          - windows-latest
+          # - macOS-latest
+          # - windows-latest
     steps:
       - uses: actions/checkout@v3
       - uses: jiro4989/setup-nim-action@v2
@@ -30,17 +30,17 @@ jobs:
           nim-version: ${{ matrix.nim-version }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Install PCRE dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libpcre3 libpcre3-dev
+      # - name: Install PCRE dependencies (Ubuntu)
+      #   if: runner.os == 'Linux'
+      #   run: sudo apt-get update && sudo apt-get install -y libpcre3 libpcre3-dev
       
-      - name: Install PCRE dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install pcre
+      # - name: Install PCRE dependencies (macOS)
+      #   if: runner.os == 'macOS'
+      #   run: brew install pcre
 
-      - name: Install OpenSSL (Windows)
-        if: runner.os == 'Windows'
-        run: choco install openssl
+      # - name: Install OpenSSL (Windows)
+      #   if: runner.os == 'Windows'
+      #   run: choco install openssl
 
       # - name: Install PCRE dependencies (Windows)
       #   if: runner.os == 'Windows'

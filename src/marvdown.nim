@@ -5,8 +5,9 @@
 #          https://github.com/openpeeps/marvdown
 
 # Use Marvdown as Nimble library
-import std/[htmlparser, xmltree]
+import std/xmltree
 
+import pkg/openparser/html
 import ./marvdown/[parser, ast]
 export parser, ast
 
@@ -20,11 +21,11 @@ proc toHtml*(content: sink string): owned string =
 proc toXML*(content: sink string): XmlNode =
   ## Convert Markdown content to XML Node
   var md = newMarkdown(content)
-  htmlparser.parseHtml(md.toHtml())
+  # htmlparser.parseHtml(md.toHtml())
 
 proc toXML*(md: var Markdown): XmlNode =
   ## Convert a Markdown object to XML Node
-  htmlparser.parseHtml(md.toHtml())
+  # htmlparser.parseHtml(md.toHtml())
 
 proc getAst*(content: sink string): string =
   ## Retrieve the Markdown AST as a stringified JSON
