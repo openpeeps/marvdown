@@ -1,5 +1,6 @@
-import unittest, options, strutils
+import unittest, options, strutils, tables
 import marvdown
+import pkg/openparser/yaml as yamlmod
 
 let opts = MarkdownOptions(
   allowed: @[
@@ -142,16 +143,33 @@ suite "extensions":
     var md = newMarkdown(sample, opts)
     assert md.toHtml().contains("Hello")
 
+  test "yaml getHeader":
+    let sample = "---\ntitle: Introduction\ndescription: \"hello world\"\n---\n\nContent"
+    var md = newMarkdown(sample, opts)
+    let h = md.getHeader()
+    assert not h.isNil
+    assert h.hasKey("title")
+    assert h.hasKey("description")
+    assert yamlmod.getStr(h["title"]) == "Introduction"
+    assert yamlmod.getStr(h["description"]) == "hello world"
+
   test "table":
     let sample = "| A | B |\n| - | - |\n| 1 | 2 |"
     var md = newMarkdown(sample, noAnchors)
     let html = md.toHtml()
-    assert html.contains("<table>")
-    assert html.contains("<th>")
-    assert html.contains("A")
-    assert html.contains("B")
-    assert html.contains("<td>")
-    assert html.contains("1")
+    assert html == "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+
+  test "table with footer":
+    let sample = "| A | B |\n| - | - |\n| 1 | 2 |\n|--- |--- |\n| 3 | 4 |"
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html == "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody><tfoot><tr><td>3</td><td>4</td></tr></tfoot></table>"
+
+  test "table without separator footer":
+    let sample = "| A |\n| - |\n| 1 |\n| 2 |"
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html == "<table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr><tr><td>2</td></tr></tbody></table>"
 
   test "html block":
     let sample = "<div>content</div>"
@@ -251,3 +269,108 @@ suite "html_entities":
     let sample = "&unknown;"
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<p>&unknown;</p>"
+
+suite "bugfixes":
+  test "ATX heading level capped at 6":
+    let sample = "####### not a heading"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>####### not a heading</p>"
+
+  test "fenced code block with longer closing fence":
+    let sample = "```\ncode\n````"
+    var md = newMarkdown(sample, opts)
+    assert md.toHtml() == "<pre><code class=\"\">code</code></pre>"
+
+  test "thematic break with trailing spaces":
+    let sample = "---  \n"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr>"
+
+  test "stars thematic break with trailing spaces":
+    let sample = "***  \n"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr>"
+
+suite "backtick_spans":
+  test "single backtick code span":
+    let sample = "`code`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><code>code</code></p>"
+
+  test "double backtick with inner backtick":
+    let sample = "``code`here``"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><code>code`here</code></p>"
+
+suite "ordered_list_start":
+  test "ordered list default start":
+    let sample = "1. First\n2. Second"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol><li>First</li><li>Second</li></ol>"
+
+  test "ordered list with higher start":
+    let sample = "3. First\n4. Second"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol start=\"3\"><li>First</li><li>Second</li></ol>"
+
+suite "hard_breaks":
+  test "backslash newline hard break":
+    let sample = "line 1\\\nline 2"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>line 1<br>line 2</p>"
+
+  test "three spaces before newline hard break":
+    let sample = "line 1   \nline 2"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>line 1 <br>line 2</p>"
+
+suite "reference_links":
+  test "explicit reference":
+    let sample = "[ref]: https://example.com\n\nSee [example][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p>See <a href="https://example.com">example</a></p>"""
+
+  test "collapsed reference":
+    let sample = "[text]: https://example.com\n\n[text][]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://example.com">text</a></p>"""
+
+  test "shortcut reference":
+    let sample = "[text]: https://example.com\n\n[text]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://example.com">text</a></p>"""
+
+  test "undefined shortcut reference":
+    let sample = "[invalid]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p>[invalid]</p>"""
+
+  test "undefined explicit reference":
+    let sample = "[text][invalid]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p>[text][invalid]</p>"""
+
+  test "reference with title":
+    let sample = "[ref]: https://example.com \"Example\"\n\n[link][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://example.com" title="Example">link</a></p>"""
+
+  test "case insensitive label":
+    let sample = "[REF]: https://example.com\n\n[text][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://example.com">text</a></p>"""
+
+  test "first definition wins":
+    let sample = "[ref]: https://first.com\n[ref]: https://second.com\n\n[link][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://first.com">link</a></p>"""
+
+  test "reference in list item":
+    let sample = "[ref]: https://example.com\n\n- [text][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<ul><li><a href="https://example.com">text</a></li></ul>"""
+
+  test "angle bracket url in definition":
+    let sample = "[ref]: <https://example.com>\n\n[link][ref]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://example.com">link</a></p>"""

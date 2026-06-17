@@ -30,6 +30,8 @@ type
     mtkParagraph,      # Paragraph
     mtkFootnoteRef,    # Footnote reference
     mtkFootnoteDef,    # Footnote definition
+    mtkLinkDef,        # Link definition: [label]: url "title"
+    mtkRefLink,        # Reference link: [text][ref], [text][], [text]
     mtkDocument,       # Root document node
     mtkUnknown         # Unknown or unsupported token
     mtkEOF             # End of file/input
@@ -258,14 +260,15 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkEOF)
 
   # Indented code block (4 spaces or 1 tab at line start)
-  if lex.current == ' ' and newlineCount > 0:
+  let atLineStart = newlineCount > 0 or lex.pos == 0
+  if lex.current == ' ' and atLineStart:
     var sc = 0
     var tp = lex.pos
     while tp < lex.input.len and lex.input[tp] == ' ':
       inc sc; inc tp
     if sc >= 4:
       return lex.parseIndentedCodeBlock()
-  elif lex.current == '\t' and newlineCount > 0:
+  elif lex.current == '\t' and atLineStart:
     return lex.parseIndentedCodeBlock()
 
   case lex.current
@@ -275,7 +278,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     while lex.current == '#':
       inc level
       lex.advance()
-    if lex.current == ' ':
+    if level <= 6 and lex.current == ' ':
       lex.advance()
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
@@ -293,28 +296,38 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       inc count
       lex.advance()
 
-    if count >= 3 and (lex.current in {'\n', '\r', '\0'}):
-      # Horizontal rule, or the beginning of a YAML front matter
-      if lex.line == 1 and lex.current in {'\n', '\r'}:
-        # Check if next line has content (not just blank)
-        var peekPos = lex.pos + 1
-        while peekPos < lex.input.len and lex.input[peekPos] in {' ', '\t'}:
-          inc peekPos
-        if peekPos < lex.input.len and lex.input[peekPos] notin {'\n', '\r', '\0'}:
-          # YAML front matter detected
-          lex.strbuf.setLen(0)
-          while true:
-            if lex.current == '\0':
-              break
-            if lex.current == '-' and lex.peek() == '-' and lex.peek(2) == '-':
-              lex.advance(); lex.advance(); lex.advance()
-              if lex.current in {'\n', '\r'}:
-                lex.advance()
-              break
-            lex.strbuf.add(lex.current)
-            lex.advance()
-          return newTokenTuple(lex, mtkDocument, lex.strbuf.strip())
-      return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count))
+    if count >= 3:
+      # Check for trailing whitespace before newline/EOF
+      # Note: dashes are already consumed by the counting loop above
+      # lex.current is the first character after the dashes
+      var sp = 0
+      while lex.peek(sp) in {' ', '\t'}:
+        inc sp
+      if lex.peek(sp) in {'\n', '\r', '\0'}:
+        # Consume trailing whitespace only
+        while lex.current in {' ', '\t'}:
+          lex.advance()
+        if lex.line == 1 and lex.current in {'\n', '\r'}:
+          # Check if next line has content (YAML front matter)
+          var peekPos = lex.pos + 1
+          while peekPos < lex.input.len and lex.input[peekPos] in {' ', '\t'}:
+            inc peekPos
+          if peekPos < lex.input.len and lex.input[peekPos] notin {'\n', '\r', '\0'}:
+            lex.advance()  # consume the \n after opening ---
+            lex.strbuf.setLen(0)
+            while true:
+              if lex.current == '\0': break
+              if lex.current == '-' and lex.peek() == '-' and lex.peek(2) == '-':
+                lex.advance(); lex.advance(); lex.advance()
+                while lex.current in {' ', '\t'}:
+                  lex.advance()
+                if lex.current in {'\n', '\r'}:
+                  lex.advance()
+                break
+              lex.strbuf.add(lex.current)
+              lex.advance()
+            return newTokenTuple(lex, mtkDocument, lex.strbuf.strip())
+        return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count))
 
     if ch == '-' and (lex.current == ' ' or lex.current == '\t'):
       # Unordered list item; '*' and '+' have their own handlers
@@ -378,24 +391,30 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.strbuf.add(lex.current)
       lex.advance()
     if lex.current == '.' and (lex.peek() == ' ' or lex.peek() == '\t'):
+      let startNum = lex.strbuf
       lex.advance()
       if lex.current == ' ' or lex.current == '\t':
         lex.advance()
-      let num = lex.strbuf
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      result = newTokenTuple(lex, mtkOListItem, lex.strbuf.strip())
+      result = newTokenTuple(lex, mtkOListItem, lex.strbuf.strip(), attrs=some(@[startNum]))
       result.indent = indentCol
       return result
     else:
       return newTokenTuple(lex, mtkText, lex.strbuf)
   of '`', '~':
     # Fenced code block (``` or ~~~)
-    if lex.peek() == lex.current and lex.peek(2) == lex.current:
+    var fenceLen = 1
+    while lex.peek(fenceLen) == lex.current:
+      inc fenceLen
+    if fenceLen >= 3:
       let fence = lex.current
-      lex.advance(); lex.advance(); lex.advance()
+      var i = 0
+      while i < fenceLen:
+        lex.advance()
+        inc i
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
@@ -404,24 +423,44 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       if lex.current in {'\n', '\r'}:
         lex.advance()
       lex.strbuf.setLen(0)
-      while not (lex.current == fence and lex.peek() == fence and lex.peek(2) == fence):
-        if lex.current == '\0':
-          break
-        lex.strbuf.add(lex.current)
-        lex.advance()
-      if lex.current == fence:
-        lex.advance(); lex.advance(); lex.advance()
-      if lex.current in {'\n', '\r'}:
-        lex.advance()
+      # Closing fence: must be ≥ fenceLen of the same fence char
+      block findClose:
+        while lex.current != '\0':
+          if lex.current == fence:
+            var closeLen = 0
+            while closeLen < lex.input.len - lex.pos and lex.input[lex.pos + closeLen] == fence:
+              inc closeLen
+            if closeLen >= fenceLen:
+              i = 0
+              while i < closeLen:
+                lex.advance()
+                inc i
+              if lex.current in {'\n', '\r'}:
+                lex.advance()
+              break findClose
+          lex.strbuf.add(lex.current)
+          lex.advance()
       return newTokenTuple(lex, mtkCodeBlock, lex.strbuf, attrs=some(@[lang]))
     elif lex.current == '`':
-      # Inline code
-      lex.advance()
-      lex.strbuf.setLen(0)
-      while lex.current != '`' and lex.current != '\0':
-        lex.strbuf.add(lex.current)
+      # Inline code with 1 or more backticks
+      var openCount = fenceLen
+      var i = 0
+      while i < openCount:
         lex.advance()
-      if lex.current == '`':
+        inc i
+      lex.strbuf.setLen(0)
+      while lex.current != '\0':
+        if lex.current == '`':
+          var closeCount = 0
+          while closeCount < lex.input.len - lex.pos and lex.input[lex.pos + closeCount] == '`':
+            inc closeCount
+          if closeCount >= openCount:
+            i = 0
+            while i < closeCount:
+              lex.advance()
+              inc i
+            break
+        lex.strbuf.add(lex.current)
         lex.advance()
       return newTokenTuple(lex, mtkInlineCode, lex.strbuf)
     elif lex.current == '~' and lex.peek() == '~':
@@ -479,7 +518,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
       return newTokenTuple(lex, mtkText, text)
   of '[':
-    # Link, Checkbox, or Footnote
+    # Link, Checkbox, Footnote, or Reference
     if lex.peek() == '^':
       # Footnote reference or definition
       lex.advance() # skip '['
@@ -505,25 +544,24 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         else:
           # Footnote reference: [^id]
           return newTokenTuple(lex, mtkFootnoteRef, "", attrs=some(@[footId]))
-    # Regular link or checkbox
+    # Regular link, checkbox, link def, or reference
     lex.advance()
     lex.strbuf.setLen(0)
     while lex.current != ']' and lex.current != '\0':
       lex.strbuf.add(lex.current)
       lex.advance()
-    let text = lex.strbuf
+    let text = lex.strbuf.strip()
     if lex.current == ']':
       lex.advance()
       if lex.current == '(':
+        # Inline link: [text](url)
         lex.advance()
         lex.strbuf.setLen(0)
-        # Parse href
         while lex.current notin {' ', '\t', ')', '\n', '\r', '\0'}:
           lex.strbuf.add(lex.current)
           lex.advance()
         let href = lex.strbuf
         var title = ""
-        # Parse optional title
         while lex.current == ' ' or lex.current == '\t':
           lex.advance()
         if lex.current == '"':
@@ -535,7 +573,6 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
           title = titleBuf
           if lex.current == '"':
             lex.advance()
-        # Skip whitespace before closing ')'
         while lex.current == ' ' or lex.current == '\t':
           lex.advance()
         if lex.current == ')':
@@ -544,24 +581,84 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
           return newTokenTuple(lex, mtkLink, attrs=some(@[text, href, title]))
         else:
           return newTokenTuple(lex, mtkLink, attrs=some(@[text, href]))
-      let checkState =
-        if text == "x": "checked"
-          else: "unchecked"
-      return newTokenTuple(lex, mtkListItemCheckbox, attrs=some(@["checkbox", checkState]))
-    return newTokenTuple(lex, mtkText, text)
+      elif lex.current == '[':
+        # Explicit reference: [text][ref] or collapsed: [text][]
+        lex.advance()  # skip '['
+        lex.strbuf.setLen(0)
+        while lex.current != ']' and lex.current != '\0':
+          lex.strbuf.add(lex.current)
+          lex.advance()
+        let refLabel = lex.strbuf.strip()
+        if lex.current == ']':
+          lex.advance()
+        if refLabel.len > 0:
+          return newTokenTuple(lex, mtkRefLink, attrs=some(@[text, refLabel]))
+        else:
+          # Collapsed: [text][] — use text as ref
+          return newTokenTuple(lex, mtkRefLink, attrs=some(@[text, text]))
+      elif lex.current == ':':
+        # Possible link definition: [label]: url "title"
+        if lex.peek() in {' ', '\t', '\n', '\r'}:
+          lex.advance()  # skip ':'
+          while lex.current in {' ', '\t'}:
+            lex.advance()
+          # Parse URL (optionally in angle brackets)
+          lex.strbuf.setLen(0)
+          if lex.current == '<':
+            lex.advance()
+            while lex.current != '>' and lex.current notin {'\n', '\r', '\0'}:
+              lex.strbuf.add(lex.current)
+              lex.advance()
+            if lex.current == '>':
+              lex.advance()
+          else:
+            while lex.current notin {' ', '\t', '\n', '\r', '\0'}:
+              lex.strbuf.add(lex.current)
+              lex.advance()
+          let url = lex.strbuf
+          var title = ""
+          while lex.current in {' ', '\t'}:
+            lex.advance()
+          if lex.current == '"':
+            lex.advance()
+            var titleBuf = ""
+            while lex.current != '"' and lex.current notin {'\n', '\r', '\0'}:
+              titleBuf.add(lex.current)
+              lex.advance()
+            if lex.current == '"':
+              lex.advance()
+            title = titleBuf
+          if title.len > 0:
+            return newTokenTuple(lex, mtkLinkDef, attrs=some(@[text, url, title]))
+          else:
+            return newTokenTuple(lex, mtkLinkDef, attrs=some(@[text, url]))
+      # Checkbox or shortcut reference
+      if text == "x" or text == " ":
+        return newTokenTuple(lex, mtkListItemCheckbox, attrs=some(@["checkbox",
+          if text == "x": "checked" else: "unchecked"]))
+      # Shortcut reference: [text] where text is also the label
+      return newTokenTuple(lex, mtkRefLink, attrs=some(@[text, text]))
+    return newTokenTuple(lex, mtkText, "[" & text)
   of '*':
     # Could be horizontal rule, emphasis, strong, or unordered list item
     let indentCol = lex.col
     var starCount = 1
     while lex.peek(starCount) == '*':
       inc starCount
-    if starCount >= 3 and (lex.peek(starCount) in {'\n', '\r', '\0'}):
-      # Horizontal rule (***)
-      var i = 0
-      while i < starCount:
-        lex.advance()
-        inc i
-      return newTokenTuple(lex, mtkHorizontalRule, repeat('*', starCount))
+    if starCount >= 3:
+      # Skip trailing whitespace
+      var sp = starCount
+      while lex.peek(sp) in {' ', '\t'}:
+        inc sp
+      if lex.peek(sp) in {'\n', '\r', '\0'}:
+        # Horizontal rule (***)
+        var i = 0
+        while i < starCount:
+          lex.advance()
+          inc i
+        while lex.current in {' ', '\t', '\n', '\r'}:
+          lex.advance()
+        return newTokenTuple(lex, mtkHorizontalRule, repeat('*', starCount))
     if indentCol == 0 and (lex.peek() == ' ' or lex.peek() == '\t'):
       # List item (e.g., "* item") only at start of line
       lex.advance()
@@ -700,7 +797,11 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   of '\\':
     # Backslash escape — produce the literal next character
     lex.advance()
-    if lex.current in {'!', '"', '#', '$', '%', '&', '\'', '(', ')',
+    if lex.current in {'\n', '\r'}:
+      # Hard line break (backslash + newline)
+      lex.advance()
+      return newTokenTuple(lex, mtkLineBreak)
+    elif lex.current in {'!', '"', '#', '$', '%', '&', '\'', '(', ')',
                         '*', '+', ',', '-', '.', '/', ':', ';', '<',
                         '=', '>', '?', '@', '[', '\\', ']', '^', '_',
                         '`', '{', '|', '}', '~'}:

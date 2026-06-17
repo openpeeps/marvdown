@@ -36,6 +36,8 @@ type
       ## Footnote definitions parsed from the document
     footnotesHtml*: string
       ## Generated HTML for footnotes at the end of the document
+    linkDefs*: TableRef[string, tuple[url, title: string]]
+      ## Link definitions collected from the document (pre-scan)
 
   TagType* = enum
     tagNone,       # No tags allowed
@@ -251,12 +253,12 @@ const stopKinds = {
   mtkEOF, mtkParagraph, mtkHeading, mtkTable,
   mtkListItem, mtkListItemCheckbox, mtkOListItem,
   mtkCodeBlock, mtkBlockquote, mtkHorizontalRule,
-  mtkDocument, mtkFootnoteDef
+  mtkDocument, mtkFootnoteDef, mtkLinkDef
 }
 
 const inlineKinds = {
   mtkStrong, mtkEmphasis, mtkStrikethrough, mtkLink, mtkImage,
-  mtkInlineCode, mtkFootnoteRef, mtkLineBreak
+  mtkInlineCode, mtkFootnoteRef, mtkLineBreak, mtkRefLink
 }
 
 proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
@@ -303,6 +305,23 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
       md.advance()
     of mtkLineBreak:
       node = newRawHtml("<br>", curr.line)
+      md.advance()
+    of mtkRefLink:
+      let attrs = curr.attrs.get()
+      let displayText = attrs[0]
+      let isExplicit = attrs.len > 1 and attrs[1].len > 0 and attrs[1] != displayText
+      let refLabel = if isExplicit: attrs[1].toLowerAscii
+                     else: displayText.toLowerAscii
+      if md.linkDefs.hasKey(refLabel):
+        let def = md.linkDefs[refLabel]
+        node = newLink(def.url, def.title, curr.line)
+        for n in md.parseInline(displayText):
+          node.children.items.add(n)
+      else:
+        if isExplicit:
+          node = newText("[" & displayText & "][" & attrs[1] & "]", curr.line)
+        else:
+          node = newText("[" & displayText & "]", curr.line)
       md.advance()
     else: break
     if node != nil: items.add(node)
@@ -467,6 +486,37 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
           linkNode.children.items.add(n)
         result.add(linkNode)
       curr = lex.nextToken()
+    of mtkRefLink:
+      if curr.attrs.isSome and curr.attrs.get().len >= 2:
+        let displayText = curr.attrs.get()[0]
+        let isExplicit = curr.attrs.get().len > 1 and
+                         curr.attrs.get()[1].len > 0 and
+                         curr.attrs.get()[1] != displayText
+        let refLabel =
+          if isExplicit: curr.attrs.get()[1].toLowerAscii
+          else: displayText.toLowerAscii
+        if md.linkDefs.hasKey(refLabel):
+          let def = md.linkDefs[refLabel]
+          let linkNode = MarkdownNode(
+            kind: mdkLink,
+            linkHref: def.url,
+            linkTitle: def.title,
+            children: MarkdownNodeList(),
+            line: curr.line
+          )
+          for n in md.parseInline(displayText):
+            linkNode.children.items.add(n)
+          result.add(linkNode)
+        else:
+          if isExplicit:
+            result.add(MarkdownNode(
+              kind: mdkText,
+              text: "[" & displayText & "][" & curr.attrs.get()[1] & "]",
+              line: curr.line))
+          else:
+            result.add(MarkdownNode(
+              kind: mdkText, text: "[" & displayText & "]", line: curr.line))
+      curr = lex.nextToken()
     else:
       node = MarkdownNode(
         kind: mdkText,
@@ -509,6 +559,7 @@ proc parseListItem(md: var Markdown, parentIndent: int = 0): MarkdownNode =
       var nestedList = MarkdownNode(
         kind: mdkList,
         listOrdered: nextOrdered,
+        listStart: 1,
         children: MarkdownNodeList(items: @[]),
         line: md.parser.curr.line
       )
@@ -526,9 +577,15 @@ proc parseList(md: var Markdown): MarkdownNode =
   skipWhitespaceTokens(md)
   let startIndent = md.parser.curr.indent
   let isOrdered = md.parser.curr.kind == mtkOListItem
+  let listStart =
+    if isOrdered and md.parser.curr.attrs.isSome:
+      try: md.parser.curr.attrs.get()[0].parseInt
+      except: 1
+    else: 1
   result = MarkdownNode(
     kind: mdkList,
     listOrdered: isOrdered,
+    listStart: listStart,
     children: MarkdownNodeList(items: @[]),
     line: md.parser.curr.line
   )
@@ -595,6 +652,22 @@ proc parsePipeRow(md: var Markdown): MarkdownNode =
       md.parseInline(cell)
   
 
+proc isSeparatorLine(md: var Markdown): bool =
+  ## Check if the current line looks like a table separator (---|---|--- or :---: etc.)
+  if md.parser.curr.kind != mtkTable:
+    return false
+  let pos = md.parser.curr.post
+  var start = pos
+  while start > 0 and md.parser.lexer.input[start - 1] notin {'\n', '\r'}:
+    dec start
+  var lineEnd = pos
+  while lineEnd < md.parser.lexer.input.len and
+        md.parser.lexer.input[lineEnd] notin {'\n', '\r'}:
+    inc lineEnd
+  let lineContent = md.parser.lexer.input[start ..< lineEnd].strip()
+  result = lineContent.len > 0 and
+           lineContent.allCharsInSet({' ', '\t', '-', ':', '|', '='})
+
 proc parseTable(md: var Markdown, currentParagraph: var MarkdownNode): MarkdownNode =
   # Parse a table starting with the header row
   # Header row
@@ -616,7 +689,6 @@ proc parseTable(md: var Markdown, currentParagraph: var MarkdownNode): MarkdownN
         sepText.add(md.parser.curr.token)
       md.advance()
     if not sepText.contains("-"):
-      # not a separator; nothing to do (already consumed as normal row text line)
       discard
 
   result = MarkdownNode(
@@ -625,11 +697,32 @@ proc parseTable(md: var Markdown, currentParagraph: var MarkdownNode): MarkdownN
     line: headerRow.line
   )
 
-  # Body rows in source order
+  # Body rows and optional footer
+  var footerRows: seq[MarkdownNode]
   while md.parser.curr.kind == mtkTable:
-    let row = md.parsePipeRow()
-    if row.children.items.len > 0:
-      result.children.items.add(row)
+    # Peek ahead: if this line looks like a separator (dashes/pipes), it's a footer delimiter
+    if footerRows.len == 0 and md.isSeparatorLine():
+      # Consume the separator line
+      let sepLine = md.parser.curr.line
+      while md.parser.curr.kind != mtkEOF and md.parser.curr.line == sepLine:
+        md.advance()
+      # Remaining rows are footer
+      while md.parser.curr.kind == mtkTable:
+        let row = md.parsePipeRow()
+        if row.children.items.len > 0:
+          footerRows.add(row)
+      break
+    else:
+      let row = md.parsePipeRow()
+      if row.children.items.len > 0:
+        result.children.items.add(row)
+
+  if footerRows.len > 0:
+    result.children.items.add(MarkdownNode(
+      kind: mdkTableFooter,
+      children: MarkdownNodeList(items: footerRows),
+      line: footerRows[0].line
+    ))
 
 #
 # Init Marvdown with content and options
@@ -857,6 +950,36 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       ))
       md.advance()
     #
+    # Link definitions (invisible — already collected by pre-scan)
+    #
+    of mtkLinkDef:
+      md.advance()
+    #
+    # Reference links
+    #
+    of mtkRefLink:
+      let attrs = curr.attrs.get()
+      let displayText = attrs[0]
+      let isExplicit = attrs.len > 1 and attrs[1].len > 0 and attrs[1] != displayText
+      let refLabel = if isExplicit: attrs[1].toLowerAscii
+                     else: displayText.toLowerAscii
+      if md.linkDefs.hasKey(refLabel):
+        let def = md.linkDefs[refLabel]
+        withCurrentParagraph do:
+          let linkNode = newLink(def.url, def.title, curr.line)
+          for n in md.parseInline(displayText):
+            linkNode.children.items.add(n)
+          currentParagraph.children.items.add(linkNode)
+      else:
+        withCurrentParagraph do:
+          if isExplicit:
+            currentParagraph.children.items.add(
+              newText("[" & displayText & "][" & attrs[1] & "]", curr.line))
+          else:
+            currentParagraph.children.items.add(
+              newText("[" & displayText & "]", curr.line))
+      md.advance()
+    #
     # YAML Front Matter
     #
     of mtkDocument:
@@ -892,12 +1015,29 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     else:
       closeCurrentParagraph()
 
+proc collectLinkDefs(content: string): TableRef[string, tuple[url, title: string]] =
+  ## Pre-scan the document for link definitions: [label]: url "title"
+  result = newTable[string, tuple[url, title: string]]()
+  var lex = initLexer(content)
+  var tok = lex.nextToken()
+  while tok.kind != mtkEOF:
+    if tok.kind == mtkLinkDef and tok.attrs.isSome:
+      let a = tok.attrs.get()
+      if a.len >= 2:
+        let label = a[0].strip().toLowerAscii
+        let url = a[1]
+        let title = if a.len > 2: a[2] else: ""
+        if not result.hasKey(label):
+          result[label] = (url, title)
+    tok = lex.nextToken()
+
 proc newMarkdown*(content: sink string,
               opts: MarkdownOptions = defaultOptions): Markdown =
   ## Create a new Markdown instance
   var md = Markdown(
     parser: MarkdownParser(lexer: initLexer(content, opts.enableEmailAutolinks)),
     opts: opts,
+    linkDefs: collectLinkDefs(content),
     selectors: newOrderedTable[string, string](),
     selectorCounter: newCountTable[string]()
   )
@@ -1151,7 +1291,10 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     for item in node.children.items:
       listItems.add(md.renderNode(item))
     if node.listOrdered:
-      result = ol(listItems)
+      if node.listStart > 1:
+        result = "<ol start=\"" & $node.listStart & "\">" & listItems & "</ol>"
+      else:
+        result = ol(listItems)
     else:
       result = ul(listItems)
   of mdkListItem:
@@ -1241,14 +1384,18 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
       html = "<table class=\"" & md.opts.htmlTableClasses.get().join(" ") & "\">"
     else:
       html = "<table>"
-    var startIdx = 0
+    var idx = 0
     if node.children.items.len > 0 and node.children.items[0].kind == mdkTableHeader:
       html.add(md.renderNode(node.children.items[0]))
-      startIdx = 1
+      idx = 1
     html.add("<tbody>")
-    for i in startIdx ..< node.children.items.len:
-      html.add(md.renderNode(node.children.items[i]))
-    html.add("</tbody></table>")
+    while idx < node.children.items.len and node.children.items[idx].kind != mdkTableFooter:
+      html.add(md.renderNode(node.children.items[idx]))
+      inc idx
+    html.add("</tbody>")
+    if idx < node.children.items.len and node.children.items[idx].kind == mdkTableFooter:
+      html.add(md.renderNode(node.children.items[idx]))
+    html.add("</table>")
     result = html
   of mdkTableHeader:
     var html = "<thead><tr>"
@@ -1258,6 +1405,18 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
         html.add(md.renderNode(child))
       html.add("</th>")
     html.add("</tr></thead>")
+    result = html
+  of mdkTableFooter:
+    var html = "<tfoot>"
+    for row in node.children.items:
+      html.add("<tr>")
+      for cell in row.children.items:
+        html.add("<td>")
+        for child in cell.children.items:
+          html.add(md.renderNode(child))
+        html.add("</td>")
+      html.add("</tr>")
+    html.add("</tfoot>")
     result = html
   of mdkTableRow:
     var html = "<tr>"

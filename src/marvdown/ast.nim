@@ -28,6 +28,7 @@ type
     mdkTable,          # Table
     mdkTableHeader,    # Table header
     mdkTableRow,       # Table row
+    mdkTableFooter,    # Table footer
     mdkTableCell,      # Table cell
     mdkParagraph,      # Paragraph
     mdkFootnoteDef,    # Footnote definition
@@ -62,6 +63,7 @@ type
         ## Generated if `enableAnchors` is true in `MarkdownOptions`
     of mdkList:
       listOrdered*: bool
+      listStart*: int
     of mdkLink:
       linkHref*: string
         ## URL for the link
