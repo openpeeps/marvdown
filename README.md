@@ -105,8 +105,6 @@ _Benchmark made with [hyperfine](https://github.com/sharkdp/hyperfine)_
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/marvdown/issues)
 - 👋 Wanna help? [Fork it!](https://github.com/openpeeps/marvdown/fork)
-- 😎 [Get €20 in cloud credits from Hetzner](https://hetzner.cloud/?ref=Hm0mYGM9NxZ4)
-- 🥰 [Donate to OpenPeeps via PayPal address](https://www.paypal.com/donate/?hosted_button_id=RJK3ZTDWPL55C)
 
 ### Credits
 Original illustration made by 💙 [Olha](https://www.deviantart.com/jo316) remixed with Sora.
