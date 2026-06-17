@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[strutils, sequtils, options, tables, unidecode]
+import std/[strutils, sequtils, options, tables, unicode, unidecode]
 import pkg/openparser/[json, yaml, html]
 
 export HtmlTag
@@ -47,8 +47,8 @@ type
     allowed*: seq[HtmlTag]
       ## Allowed HTML tag names. See `defaultMarkdownOptions`
       ## Marv is using `HtmlTag` from `std/htmlparser`
-      ## **Attention!** An empty `@[]` means all tags are allowed.
-      # TODO an empty seq should not mean all tags allowed, just none extra
+      ## **Attention!** An empty `@[]` means no tags are allowed.
+      ## Use `allowTagsByType` to allow tags by category.
     allowTagsByType*: Option[TagType]
       ## Allow HTML tags by their types. Default is `none(TagType)`.
       # TODO allow a set of TagType values? and merge with `allowed`?
@@ -65,6 +65,8 @@ type
       ## Insert footnotes HTML at the end of the document (default: true)
     htmlTableClasses*: Option[seq[string]]
       ## Optional CSS classes to add to generated HTML tables (e.g., `["table", "table-striped"]` for Bootstrap tables)
+    enableEmailAutolinks*: bool
+      ## Enable email autolinks in angle brackets (e.g., `<user@example.com>`)
 
 #
 # forward declarations
@@ -216,6 +218,35 @@ proc parseEmphasis(md: var Markdown): MarkdownNode =
     result = MarkdownNode(kind: mdkText, line: tk.line)
     result.text = "*" & str
 
+proc parseStrikethrough(md: var Markdown): MarkdownNode =
+  let tk = md.parser.curr
+  md.advance()
+  var children = newSeq[MarkdownNode]()
+  while md.parser.curr.kind notin {mtkStrikethrough, mtkEOF}:
+    case md.parser.curr.kind
+    of mtkText:
+      children.add(md.parseText())
+    of mtkEmphasis:
+      children.add(md.parseEmphasis())
+    of mtkStrong:
+      children.add(md.parseStrong())
+    else: break
+    md.advance()
+  if md.parser.curr.kind == mtkStrikethrough and md.parser.curr.line == tk.line:
+    result = MarkdownNode(
+      kind: mdkStrikethrough,
+      children: MarkdownNodeList(items: children),
+      line: tk.line
+    )
+    md.advance()
+  else:
+    children.insert(MarkdownNode(kind: mdkText, text: "~~"), 0)
+    result = MarkdownNode(
+      kind: mdkText,
+      children: MarkdownNodeList(items: children),
+      line: tk.line
+    )
+
 const stopKinds = {
   mtkEOF, mtkParagraph, mtkHeading, mtkTable,
   mtkListItem, mtkListItemCheckbox, mtkOListItem,
@@ -224,7 +255,7 @@ const stopKinds = {
 }
 
 const inlineKinds = {
-  mtkStrong, mtkEmphasis, mtkLink, mtkImage,
+  mtkStrong, mtkEmphasis, mtkStrikethrough, mtkLink, mtkImage,
   mtkInlineCode, mtkFootnoteRef, mtkLineBreak
 }
 
@@ -247,6 +278,8 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
       node = md.parseEmphasis()
     of mtkStrong:
       node = md.parseStrong()
+    of mtkStrikethrough:
+      node = md.parseStrikethrough()
     of mtkLink:
       node = md.parseLink()
       md.advance()
@@ -306,6 +339,45 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
         line: emphLine
       )
       if curr.kind == mtkEmphasis:
+        curr = lex.nextToken()
+    of mtkStrikethrough:
+      let stLine = curr.line
+      curr = lex.nextToken()
+      var stChildren: seq[MarkdownNode] = @[]
+      while curr.kind != mtkStrikethrough and curr.kind != mtkEOF:
+        case curr.kind
+        of mtkText:
+          stChildren.add(MarkdownNode(
+            kind: mdkText,
+            text: curr.token,
+            line: curr.line
+          ))
+        of mtkEmphasis:
+          var emphChildren: seq[MarkdownNode] = @[]
+          let emphLine = curr.line
+          curr = lex.nextToken()
+          while curr.kind != mtkEmphasis and curr.kind != mtkEOF:
+            if curr.kind == mtkText:
+              emphChildren.add(MarkdownNode(
+                kind: mdkText, text: curr.token, line: curr.line
+              ))
+            curr = lex.nextToken()
+          stChildren.add(MarkdownNode(
+            kind: mdkEmphasis,
+            children: MarkdownNodeList(items: emphChildren),
+            line: emphLine
+          ))
+        else:
+          stChildren.add(MarkdownNode(
+            kind: mdkText, text: curr.token, line: curr.line
+          ))
+        curr = lex.nextToken()
+      node = MarkdownNode(
+        kind: mdkStrikethrough,
+        children: MarkdownNodeList(items: stChildren),
+        line: stLine
+      )
+      if curr.kind == mtkStrikethrough:
         curr = lex.nextToken()
     of mtkImage:
       # Parse image inline
@@ -406,13 +478,17 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
     # add the parsed node to result
     if node != nil: result.add(node)
 
-proc parseListItem(md: var Markdown): MarkdownNode =
+proc skipWhitespaceTokens(md: var Markdown) =
+  ## Skip leading whitespace tokens (spaces between list items)
+  while md.parser.curr.kind == mtkText and md.parser.curr.token == " ":
+    md.advance()
+
+proc parseListItem(md: var Markdown, parentIndent: int = 0): MarkdownNode =
   # Parse a single list item, handling nested lists recursively
   if md.parser.curr.kind == mtkListItemCheckbox:
-    # Delegate to checkbox parser
     return md.parseCheckboxItem()
   let itemText = md.parser.curr.token.strip()
-  let indentLevel = 0
+  let indentLevel = md.parser.curr.indent
   let isOrdered = md.parser.curr.kind == mtkOListItem
   result = MarkdownNode(
     kind: mdkListItem,
@@ -423,9 +499,10 @@ proc parseListItem(md: var Markdown): MarkdownNode =
     for n in md.parseInline(itemText):
       result.children.items.add(n)
   md.advance()
+  skipWhitespaceTokens(md)
   # Check for nested lists
   while md.parser.curr.kind in {mtkListItem, mtkListItemCheckbox, mtkOListItem}:
-    let nextIndent = 0
+    let nextIndent = md.parser.curr.indent
     let nextOrdered = md.parser.curr.kind == mtkOListItem
     if nextIndent > indentLevel:
       # Nested list: parse all at this deeper indent
@@ -436,15 +513,18 @@ proc parseListItem(md: var Markdown): MarkdownNode =
         line: md.parser.curr.line
       )
       while md.parser.curr.kind in {mtkListItem,
-            mtkListItemCheckbox, mtkOListItem} and nextIndent == 0:
-        let nestedItem = md.parseListItem()
+            mtkListItemCheckbox, mtkOListItem} and md.parser.curr.indent >= nextIndent:
+        skipWhitespaceTokens(md)
+        if md.parser.curr.kind notin {mtkListItem, mtkListItemCheckbox, mtkOListItem}: break
+        let nestedItem = md.parseListItem(nextIndent)
         nestedList.children.items.add(nestedItem)
       result.children.items.add(nestedList)
     else: break
 
 proc parseList(md: var Markdown): MarkdownNode =
   # Parse a sequence of list items into a single list node
-  let startIndent = 0
+  skipWhitespaceTokens(md)
+  let startIndent = md.parser.curr.indent
   let isOrdered = md.parser.curr.kind == mtkOListItem
   result = MarkdownNode(
     kind: mdkList,
@@ -452,11 +532,14 @@ proc parseList(md: var Markdown): MarkdownNode =
     children: MarkdownNodeList(items: @[]),
     line: md.parser.curr.line
   )
-  while md.parser.curr.kind in {mtkListItem, mtkListItemCheckbox, mtkOListItem} and startIndent == 0:
-    # If the list type changes, break and let the main parser handle the new list
+  while md.parser.curr.kind in {mtkListItem, mtkListItemCheckbox, mtkOListItem} and
+        md.parser.curr.indent == startIndent:
     if (md.parser.curr.kind == mtkOListItem) != isOrdered: break
-    let itemNode = md.parseListItem()
+    skipWhitespaceTokens(md)
+    if md.parser.curr.kind notin {mtkListItem, mtkListItemCheckbox, mtkOListItem}: break
+    let itemNode = md.parseListItem(startIndent)
     result.children.items.add(itemNode)
+    skipWhitespaceTokens(md)
 
 proc parseBlockquote(md: var Markdown): MarkdownNode =
   # Parse one or more consecutive blockquote tokens into a blockquote node
@@ -486,7 +569,21 @@ proc parsePipeRow(md: var Markdown): MarkdownNode =
   md.advance() # consume first '|'
   while md.parser.curr.kind != mtkEOF and md.parser.curr.line == rowLine:
     if md.parser.curr.kind == mtkTable:
-      # End of cell, let's start parse the cell content and add to result
+      # Strip leading/trailing whitespace from cell text
+      while cell.len > 0 and cell[0].kind == mdkText and cell[0].text.strip() == "":
+        cell.delete(0)
+      if cell.len > 0 and cell[0].kind == mdkText:
+        var j = 0
+        while j < cell[0].text.len and cell[0].text[j] in {' ', '\t'}:
+          inc j
+        cell[0].text = cell[0].text[j .. ^1]
+      while cell.len > 0 and cell[^1].kind == mdkText and cell[^1].text.strip() == "":
+        cell.delete(cell.len - 1)
+      if cell.len > 0 and cell[^1].kind == mdkText:
+        var j = cell[^1].text.len - 1
+        while j >= 0 and cell[^1].text[j] in {' ', '\t'}:
+          dec j
+        cell[^1].text = cell[^1].text[0 .. j]
       result.children.items.add(MarkdownNode(
         kind: mdkTableCell,
         children: MarkdownNodeList(items: cell),
@@ -574,7 +671,8 @@ let defaultOptions = MarkdownOptions(
   allowTagsByType: none(TagType),
   allowInlineStyle: false,
   allowHtmlAttributes: false,
-  enableAnchors: true
+  enableAnchors: true,
+  enableEmailAutolinks: false
 )
 
 proc parseFootnoteDef(md: var Markdown): MarkdownNode = 
@@ -633,6 +731,10 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       withCurrentParagraph do:
         let node = md.parseEmphasis()
         currentParagraph.children.items.add(node)
+    of mtkStrikethrough:
+      withCurrentParagraph do:
+        let node = md.parseStrikethrough()
+        currentParagraph.children.items.add(node)
     of mtkInlineCode:
       withCurrentParagraph do:
         let codeNode = MarkdownNode(
@@ -676,19 +778,30 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
       closeCurrentParagraph()
       let tag = curr.attrs.get()[0]
       let tagType = html.getHtmlTag(tag)
-      if md.opts.allowed.len > 0:
-        if not md.opts.allowed.contains(tagType):
-          # TODO handle disallowed tags (e.g., escape or ignore)
-          withCurrentParagraph do:
-            let textValue =
-              curr.token.multiReplace(("<", "&lt;"), (">", "&gt;"))
-            currentParagraph.children.items.add(MarkdownNode(
-              kind: mdkText,
-              text: textValue,
-              line: curr.line
-            ))
-            md.advance()
-            continue
+
+      block checkAllowed:
+        if md.opts.allowed.len > 0:
+          if md.opts.allowed.contains(tagType):
+            break checkAllowed
+        elif md.opts.allowTagsByType.isSome:
+          let byType = md.opts.allowTagsByType.get()
+          if byType == tagAll:
+            break checkAllowed
+          if byType == tagBlock and tagType in blockLevelTags:
+            break checkAllowed
+          if byType == tagInline and tagType notin blockLevelTags:
+            break checkAllowed
+
+        withCurrentParagraph do:
+          let textValue =
+            curr.token.multiReplace(("<", "&lt;"), (">", "&gt;"))
+          currentParagraph.children.items.add(MarkdownNode(
+            kind: mdkText,
+            text: textValue,
+            line: curr.line
+          ))
+          md.advance()
+          continue
       let htmlNode = MarkdownNode(
         kind: mdkHtml,
         html: curr.token,
@@ -783,7 +896,7 @@ proc newMarkdown*(content: sink string,
               opts: MarkdownOptions = defaultOptions): Markdown =
   ## Create a new Markdown instance
   var md = Markdown(
-    parser: MarkdownParser(lexer: initLexer(content)),
+    parser: MarkdownParser(lexer: initLexer(content, opts.enableEmailAutolinks)),
     opts: opts,
     selectors: newOrderedTable[string, string](),
     selectorCounter: newCountTable[string]()
@@ -840,6 +953,161 @@ proc getTitle*(md: Markdown): string =
   else: "Untitled document"
 
 #
+# HTML Entity Decoding
+#
+proc decodeHtmlEntities*(s: string): string =
+  ## Decode HTML entities in a string (e.g., `&amp;` → `&`, `&#123;` → `{`).
+  ## Unknown or malformed entities are passed through unchanged.
+  result = newStringOfCap(s.len)
+  var i = 0
+  while i < s.len:
+    if s[i] == '&':
+      var semi = i + 1
+      while semi < s.len and s[semi] != ';':
+        inc semi
+      if semi < s.len:
+        let entity = s[i + 1 .. semi - 1]
+        if entity.len > 0:
+          var decoded: string
+          if entity[0] == '#':
+            if entity.len > 1 and entity[1] in {'x', 'X'}:
+              try:
+                let cp = parseHexInt(entity[2 .. ^1])
+                if cp <= 0x10FFFF:
+                  decoded = $Rune(cp)
+              except ValueError: discard
+            else:
+              try:
+                let cp = parseInt(entity[1 .. ^1])
+                if cp <= 0x10FFFF:
+                  decoded = $Rune(cp)
+              except ValueError: discard
+          else:
+            case entity
+            of "amp":   decoded = "&"
+            of "lt":    decoded = "<"
+            of "gt":    decoded = ">"
+            of "quot":  decoded = "\""
+            of "apos":  decoded = "'"
+            of "nbsp":  decoded = "\u00A0"
+            of "iexcl": decoded = "\u00A1"
+            of "cent":  decoded = "\u00A2"
+            of "pound": decoded = "\u00A3"
+            of "curren": decoded = "\u00A4"
+            of "yen":   decoded = "\u00A5"
+            of "brvbar": decoded = "\u00A6"
+            of "sect":  decoded = "\u00A7"
+            of "uml":   decoded = "\u00A8"
+            of "copy":  decoded = "\u00A9"
+            of "ordf":  decoded = "\u00AA"
+            of "laquo": decoded = "\u00AB"
+            of "not":   decoded = "\u00AC"
+            of "shy":   decoded = "\u00AD"
+            of "reg":   decoded = "\u00AE"
+            of "macr":  decoded = "\u00AF"
+            of "deg":   decoded = "\u00B0"
+            of "plusmn": decoded = "\u00B1"
+            of "sup2":  decoded = "\u00B2"
+            of "sup3":  decoded = "\u00B3"
+            of "acute": decoded = "\u00B4"
+            of "micro": decoded = "\u00B5"
+            of "para":  decoded = "\u00B6"
+            of "middot": decoded = "\u00B7"
+            of "cedil": decoded = "\u00B8"
+            of "sup1":  decoded = "\u00B9"
+            of "ordm":  decoded = "\u00BA"
+            of "raquo": decoded = "\u00BB"
+            of "frac14": decoded = "\u00BC"
+            of "frac12": decoded = "\u00BD"
+            of "frac34": decoded = "\u00BE"
+            of "iquest": decoded = "\u00BF"
+            of "times": decoded = "\u00D7"
+            of "divide": decoded = "\u00F7"
+            of "Agrave": decoded = "\u00C0"
+            of "Aacute": decoded = "\u00C1"
+            of "Acirc":  decoded = "\u00C2"
+            of "Atilde": decoded = "\u00C3"
+            of "Auml":   decoded = "\u00C4"
+            of "Aring":  decoded = "\u00C5"
+            of "AElig":  decoded = "\u00C6"
+            of "Ccedil": decoded = "\u00C7"
+            of "Egrave": decoded = "\u00C8"
+            of "Eacute": decoded = "\u00C9"
+            of "Ecirc":  decoded = "\u00CA"
+            of "Euml":   decoded = "\u00CB"
+            of "Igrave": decoded = "\u00CC"
+            of "Iacute": decoded = "\u00CD"
+            of "Icirc":  decoded = "\u00CE"
+            of "Iuml":   decoded = "\u00CF"
+            of "ETH":    decoded = "\u00D0"
+            of "Ntilde": decoded = "\u00D1"
+            of "Ograve": decoded = "\u00D2"
+            of "Oacute": decoded = "\u00D3"
+            of "Ocirc":  decoded = "\u00D4"
+            of "Otilde": decoded = "\u00D5"
+            of "Ouml":   decoded = "\u00D6"
+            of "Oslash": decoded = "\u00D8"
+            of "Ugrave": decoded = "\u00D9"
+            of "Uacute": decoded = "\u00DA"
+            of "Ucirc":  decoded = "\u00DB"
+            of "Uuml":   decoded = "\u00DC"
+            of "Yacute": decoded = "\u00DD"
+            of "THORN":  decoded = "\u00DE"
+            of "szlig":  decoded = "\u00DF"
+            of "agrave": decoded = "\u00E0"
+            of "aacute": decoded = "\u00E1"
+            of "acirc":  decoded = "\u00E2"
+            of "atilde": decoded = "\u00E3"
+            of "auml":   decoded = "\u00E4"
+            of "aring":  decoded = "\u00E5"
+            of "aelig":  decoded = "\u00E6"
+            of "ccedil": decoded = "\u00E7"
+            of "egrave": decoded = "\u00E8"
+            of "eacute": decoded = "\u00E9"
+            of "ecirc":  decoded = "\u00EA"
+            of "euml":   decoded = "\u00EB"
+            of "igrave": decoded = "\u00EC"
+            of "iacute": decoded = "\u00ED"
+            of "icirc":  decoded = "\u00EE"
+            of "iuml":   decoded = "\u00EF"
+            of "eth":    decoded = "\u00F0"
+            of "ntilde": decoded = "\u00F1"
+            of "ograve": decoded = "\u00F2"
+            of "oacute": decoded = "\u00F3"
+            of "ocirc":  decoded = "\u00F4"
+            of "otilde": decoded = "\u00F5"
+            of "ouml":   decoded = "\u00F6"
+            of "oslash": decoded = "\u00F8"
+            of "ugrave": decoded = "\u00F9"
+            of "uacute": decoded = "\u00FA"
+            of "ucirc":  decoded = "\u00FB"
+            of "uuml":   decoded = "\u00FC"
+            of "yacute": decoded = "\u00FD"
+            of "thorn":  decoded = "\u00FE"
+            of "yuml":   decoded = "\u00FF"
+            of "ndash":  decoded = "\u2013"
+            of "mdash":  decoded = "\u2014"
+            of "lsquo":  decoded = "\u2018"
+            of "rsquo":  decoded = "\u2019"
+            of "ldquo":  decoded = "\u201C"
+            of "rdquo":  decoded = "\u201D"
+            of "bull":   decoded = "\u2022"
+            of "hellip": decoded = "\u2026"
+            of "prime":  decoded = "\u2032"
+            of "Prime":  decoded = "\u2033"
+            of "euro":   decoded = "\u20AC"
+            of "trade":  decoded = "\u2122"
+            else: discard
+          if decoded.len > 0:
+            result.add(decoded)
+            i = semi + 1
+            continue
+      result.add(s[i])
+    else:
+      result.add(s[i])
+    inc i
+
+#
 # Convert parsed Markdown to HTML
 #
 import std/htmlgen
@@ -848,7 +1116,7 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
   ## Render a single MarkdownNode to HTML. This proc is called recursively for child nodes.
   case node.kind
   of mdkText:
-    result = node.text
+    result = decodeHtmlEntities(node.text)
     if node.children != nil:
       for child in node.children.items:
         result.add(md.renderNode(child))
@@ -862,6 +1130,11 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     for child in node.children.items:
       content.add(md.renderNode(child))
     result = em(content)
+  of mdkStrikethrough:
+    var content = ""
+    for child in node.children.items:
+      content.add(md.renderNode(child))
+    result = del(content)
   of mdkLink:
     var linkContent = ""
     for child in node.children.items:
@@ -980,7 +1253,10 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
   of mdkTableHeader:
     var html = "<thead><tr>"
     for cell in node.children.items:
-      html.add(md.renderNode(cell))
+      html.add("<th>")
+      for child in cell.children.items:
+        html.add(md.renderNode(child))
+      html.add("</th>")
     html.add("</tr></thead>")
     result = html
   of mdkTableRow:

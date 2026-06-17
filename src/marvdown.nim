@@ -6,8 +6,6 @@
 
 # Use Marvdown as Nimble library
 import std/xmltree
-
-import pkg/openparser/html
 import ./marvdown/[parser, ast]
 export parser, ast
 

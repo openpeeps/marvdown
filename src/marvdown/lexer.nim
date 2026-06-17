@@ -22,6 +22,7 @@ type
     mtkImage,          # Image
     mtkEmphasis,       # Emphasized text (italic)
     mtkStrong,         # Strongly emphasized text (bold)
+    mtkStrikethrough,  # Strikethrough text (~~text~~)
     mtkInlineCode,     # Inline code
     mtkLineBreak,      # Line break
     mtkHtml,           # Raw HTML content
@@ -39,7 +40,8 @@ type
     line: int
     col: int
     post: int
-    attrs: Option[seq[string]] # For future use, e.g., link title, image title, etc.
+    indent: int        # Indentation level (in spaces) for list items
+    attrs: Option[seq[string]]
 
   MarkdownLexer* = object
     input*: string
@@ -47,16 +49,18 @@ type
     pos*, line*, col*: int
     strbuf*: string
     pendingTokens: seq[MarkdownTokenTuple] # Buffer for tokens split from text
+    enableEmailAutolinks*: bool
 
 #
 # Markdown Lexer
 #
-proc initLexer*(input: sink string): MarkdownLexer =
+proc initLexer*(input: sink string, enableEmailAutolinks: bool = false): MarkdownLexer =
   result.input = input
   result.pos = 0
   result.line = 1
-  result.col = 1
+  result.col = 0
   result.strbuf = ""
+  result.enableEmailAutolinks = enableEmailAutolinks
   if input.len > 0:
     result.current = input[0]
   else:
@@ -87,18 +91,58 @@ proc peek(lex: MarkdownLexer, offset = 1): char =
 
 # For char-based tokens (no value allocation)
 proc initToken(lex: var MarkdownLexer, kind: static MarkdownTokenKind): MarkdownTokenTuple =
-  (kind, "", lex.line, lex.pos, lex.col, none(seq[string]))
+  (kind, "", lex.line, lex.pos, lex.col, 0, none(seq[string]))
 
 # For tokens that need a value (identifiers, numbers, strings, etc)
 proc initToken(lex: var MarkdownLexer, kind: MarkdownTokenKind,
                 value: sink string): MarkdownTokenTuple =
-  (kind, value, lex.line, lex.pos, lex.col, none(seq[string]))
+  (kind, value, lex.line, lex.pos, lex.col, 0, none(seq[string]))
 
 proc newTokenTuple(lex: MarkdownLexer, kind: MarkdownTokenKind,
             token: string = "",
             attrs: Option[seq[string]] = none(seq[string])
         ): MarkdownTokenTuple =
-  (kind, token, lex.line, lex.col - token.len, lex.pos, attrs)
+  (kind, token, lex.line, lex.col - token.len, lex.pos, 0, attrs)
+
+proc parseIndentedCodeBlock(lex: var MarkdownLexer): MarkdownTokenTuple =
+  lex.strbuf.setLen(0)
+  while true:
+    # Peek at the start of the next line to check indent level
+    var peekPos = lex.pos
+    var indentChars = 0
+    var isTab = false
+    while peekPos < lex.input.len and lex.input[peekPos] == ' ':
+      inc indentChars
+      inc peekPos
+    if peekPos < lex.input.len and lex.input[peekPos] == '\t':
+      isTab = true
+    if peekPos < lex.input.len and lex.input[peekPos] in {'\n', '\r', '\0'}:
+      # Blank line within code block
+      if lex.strbuf.len > 0:
+        lex.strbuf.add('\n')
+      while lex.current in {'\n', '\r'}:
+        if lex.current == '\r' and lex.peek() == '\n':
+          lex.advance()
+        lex.advance()
+      continue
+    if not (indentChars >= 4 or isTab):
+      break
+    # Consume the leading indent
+    while lex.current == ' ':
+      lex.advance()
+    if lex.current == '\t':
+      lex.advance()
+    # Read the rest of the line
+    while lex.current notin {'\n', '\r', '\0'}:
+      lex.strbuf.add(lex.current)
+      lex.advance()
+    lex.strbuf.add('\n')
+    # Consume newline(s)
+    while lex.current in {'\n', '\r'}:
+      if lex.current == '\r' and lex.peek() == '\n':
+        lex.advance()
+      lex.advance()
+  return newTokenTuple(lex, mtkCodeBlock, lex.strbuf)
 
 proc handleAutoLink(lex: var MarkdownLexer): MarkdownTokenTuple =
   var tempStrBuf = ""
@@ -137,11 +181,45 @@ proc scanTextWithLinks(lex: var MarkdownLexer): seq[MarkdownTokenTuple] =
         lex.advance() # consume first newline
         lex.advance() # consume second newline
         break
+      # Check for setext heading (=== or === underline)
+      if (nextChar == '=' or nextChar == '-') and buf.len > 0:
+        let ch = nextChar
+        var peekPos = lex.pos + 1
+        var underlineLen = 0
+        while peekPos < lex.input.len and lex.input[peekPos] == ch:
+          inc underlineLen
+          inc peekPos
+        while peekPos < lex.input.len and lex.input[peekPos] in {' ', '\t'}:
+          inc peekPos
+        if underlineLen >= 3 and (peekPos >= lex.input.len or
+                                  lex.input[peekPos] in {'\n', '\r', '\0'}):
+          let headingText = buf.strip()
+          buf.setLen(0)
+          lex.advance() # consume the newline
+          # Consume the underline line
+          while lex.current notin {'\n', '\r', '\0'}:
+            lex.advance()
+          if lex.current in {'\n', '\r'}:
+            lex.advance()
+          let level = if ch == '=': "1" else: "2"
+          result.add(newTokenTuple(lex, mtkHeading, headingText, attrs=some(@[level])))
+          return result
       # Single newline: treat as space
       buf.add(' ')
       lex.advance()
       continue
-    if lex.current in {'\0', '*', '_', '[', ']', '!', '`', '<', '|'}:
+    # Check for hard line break (two spaces before newline)
+    if lex.current == ' ' and lex.peek() == ' ' and (lex.peek(2) in {'\n', '\r'}):
+      if buf.len > 0:
+        result.add(newTokenTuple(lex, mtkText, buf))
+        buf.setLen(0)
+      lex.advance()  # skip first space
+      lex.advance()  # skip second space
+      if lex.current in {'\n', '\r'}:
+        lex.advance()  # skip newline
+      result.add(newTokenTuple(lex, mtkLineBreak))
+      return result
+    if lex.current in {'\0', '*', '_', '[', ']', '!', '`', '<', '|', '\\', '~'}:
       break # stop at special characters that may start a new token
     buf.add(lex.current)
     lex.advance()
@@ -179,6 +257,17 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     # End of input
     return newTokenTuple(lex, mtkEOF)
 
+  # Indented code block (4 spaces or 1 tab at line start)
+  if lex.current == ' ' and newlineCount > 0:
+    var sc = 0
+    var tp = lex.pos
+    while tp < lex.input.len and lex.input[tp] == ' ':
+      inc sc; inc tp
+    if sc >= 4:
+      return lex.parseIndentedCodeBlock()
+  elif lex.current == '\t' and newlineCount > 0:
+    return lex.parseIndentedCodeBlock()
+
   case lex.current
   of '#':
     # Headings (e.g., ## Heading 2)
@@ -195,38 +284,40 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return newTokenTuple(lex, mtkHeading, lex.strbuf.strip(), attrs=some(@[$level]))
     else:
       return newTokenTuple(lex, mtkText, repeat('#', level))
-  of '-', #['*',]# '_':
+  of '-', '_':
     # Horizontal rule or unordered list or emphasis/strong
-
+    let indentCol = lex.col
     let ch = lex.current
     var count = 0
     while lex.current == ch:
       inc count
       lex.advance()
-    
-    if count >= 3 and (lex.current == '\n' or lex.current == '\0'):
-      # Horizontal rule, or the begining of a YAML front matter
-      if lex.line == 1:
-        # YAML front matter detected
-        lex.strbuf.setLen(0)
-        while true:
-          if lex.current == '\0':
-            break
-          if lex.current == '-' and lex.peek() == '-' and lex.peek(2) == '-':
-            # End of front matter
-            lex.advance(); lex.advance(); lex.advance()
-            if lex.current in {'\n', '\r'}:
-              lex.advance()
-            break
-          lex.strbuf.add(lex.current)
-          lex.advance()
-        let frontMatter = lex.strbuf.strip()
-        return newTokenTuple(lex, mtkDocument, frontMatter)
-      else:
-        return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count))
 
-    if (ch in {'-', '*', '+'}) and (lex.current == ' ' or lex.current == '\t'):
-      # Unordered list item
+    if count >= 3 and (lex.current in {'\n', '\r', '\0'}):
+      # Horizontal rule, or the beginning of a YAML front matter
+      if lex.line == 1 and lex.current in {'\n', '\r'}:
+        # Check if next line has content (not just blank)
+        var peekPos = lex.pos + 1
+        while peekPos < lex.input.len and lex.input[peekPos] in {' ', '\t'}:
+          inc peekPos
+        if peekPos < lex.input.len and lex.input[peekPos] notin {'\n', '\r', '\0'}:
+          # YAML front matter detected
+          lex.strbuf.setLen(0)
+          while true:
+            if lex.current == '\0':
+              break
+            if lex.current == '-' and lex.peek() == '-' and lex.peek(2) == '-':
+              lex.advance(); lex.advance(); lex.advance()
+              if lex.current in {'\n', '\r'}:
+                lex.advance()
+              break
+            lex.strbuf.add(lex.current)
+            lex.advance()
+          return newTokenTuple(lex, mtkDocument, lex.strbuf.strip())
+      return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count))
+
+    if ch == '-' and (lex.current == ' ' or lex.current == '\t'):
+      # Unordered list item; '*' and '+' have their own handlers
       lex.advance()
       skipWhitespace(lex)
       if lex.current == '[' and (lex.peek() == 'x' or lex.peek() == ' '):
@@ -246,23 +337,26 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
           let checkState =
             if cbChar == 'x': "checked"
                         else: "unchecked"
-          return newTokenTuple(lex, mtkListItemCheckbox,
+          result = newTokenTuple(lex, mtkListItemCheckbox,
                   lex.strbuf.strip(), attrs=some(@["checkbox", checkState]))
-      
+          result.indent = indentCol
+          return result
+
       # Otherwise, normal list item
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      return newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
-    
-    if ch in {'*', '_'}:
-      # Emphasis or strong
-      if lex.peek() == ch:
-        lex.advance(); lex.advance() # skip both delimiters
+      result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
+      result.indent = indentCol
+      return result
+
+    if ch == '_':
+      # Emphasis or strong with underscore
+      if lex.peek() == '_':
+        lex.advance(); lex.advance()
         return newTokenTuple(lex, mtkStrong)
       else:
-        # lex.advance(); not needed, already advanced
         return newTokenTuple(lex, mtkEmphasis)
     else:
       return newTokenTuple(lex, mtkText, repeat(ch, count))
@@ -278,6 +372,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkBlockquote, lex.strbuf.strip())
   of '0'..'9':
     # Ordered list item
+    let indentCol = lex.col
     lex.strbuf.setLen(0)
     while lex.current in {'0'..'9'}:
       lex.strbuf.add(lex.current)
@@ -291,7 +386,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
-      return newTokenTuple(lex, mtkOListItem, lex.strbuf.strip())
+      result = newTokenTuple(lex, mtkOListItem, lex.strbuf.strip())
+      result.indent = indentCol
+      return result
     else:
       return newTokenTuple(lex, mtkText, lex.strbuf)
   of '`', '~':
@@ -327,6 +424,10 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       if lex.current == '`':
         lex.advance()
       return newTokenTuple(lex, mtkInlineCode, lex.strbuf)
+    elif lex.current == '~' and lex.peek() == '~':
+      # Strikethrough (~~)
+      lex.advance(); lex.advance()
+      return newTokenTuple(lex, mtkStrikethrough)
     else:
       # treat as text
       lex.strbuf.setLen(0)
@@ -449,12 +550,34 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return newTokenTuple(lex, mtkListItemCheckbox, attrs=some(@["checkbox", checkState]))
     return newTokenTuple(lex, mtkText, text)
   of '*':
-    # Emphasis or strong
-    if lex.peek() == '*':
+    # Could be horizontal rule, emphasis, strong, or unordered list item
+    let indentCol = lex.col
+    var starCount = 1
+    while lex.peek(starCount) == '*':
+      inc starCount
+    if starCount >= 3 and (lex.peek(starCount) in {'\n', '\r', '\0'}):
+      # Horizontal rule (***)
+      var i = 0
+      while i < starCount:
+        lex.advance()
+        inc i
+      return newTokenTuple(lex, mtkHorizontalRule, repeat('*', starCount))
+    if indentCol == 0 and (lex.peek() == ' ' or lex.peek() == '\t'):
+      # List item (e.g., "* item") only at start of line
+      lex.advance()
+      skipWhitespace(lex)
+      lex.strbuf.setLen(0)
+      while lex.current notin {'\n', '\r', '\0'}:
+        lex.strbuf.add(lex.current)
+        lex.advance()
+      result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
+      result.indent = indentCol
+      return result
+    elif lex.peek() == '*':
       lex.advance(); lex.advance()
       return newTokenTuple(lex, mtkStrong)
     else:
-      lex.advance();
+      lex.advance()
       return newTokenTuple(lex, mtkEmphasis)
   of ' ':
     # Line break (two or more spaces at end of line)
@@ -472,7 +595,43 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     var text = "\t"
     lex.advance()
     return newTokenTuple(lex, mtkText, text)
+  of '+':
+    # Unordered list item (e.g., "+ item")
+    let indentCol = lex.col
+    lex.advance()
+    if lex.current == ' ' or lex.current == '\t':
+      skipWhitespace(lex)
+      lex.strbuf.setLen(0)
+      while lex.current notin {'\n', '\r', '\0'}:
+        lex.strbuf.add(lex.current)
+        lex.advance()
+      result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
+      result.indent = indentCol
+      return result
+    else:
+      return newTokenTuple(lex, mtkText, "+")
   of '<':
+    # Check for email autolink: <user@example.com>
+    if lex.enableEmailAutolinks:
+      var peekPos = lex.pos + 1
+      var atPos = -1
+      var dotAfterAt = false
+      while peekPos < lex.input.len and lex.input[peekPos] notin {'>', ' ', '\t', '\n', '\r', '\0', '<'}:
+        if lex.input[peekPos] == '@':
+          atPos = peekPos
+        if atPos > 0 and lex.input[peekPos] == '.' and peekPos > atPos:
+          dotAfterAt = true
+        inc peekPos
+      if peekPos < lex.input.len and lex.input[peekPos] == '>' and atPos > 0 and dotAfterAt:
+        let email = lex.input[lex.pos + 1 .. peekPos - 1]
+        # Consume <email>
+        lex.advance()  # skip '<'
+        while lex.current != '>' and lex.current != '\0':
+          lex.advance()
+        if lex.current == '>':
+          lex.advance()
+        return newTokenTuple(lex, mtkLink, attrs=some(@[email, "mailto:" & email]))
+
     # Raw HTML block: consume until matching closing tag (handles nesting)
     lex.strbuf.setLen(0)
     var tag: string
@@ -485,20 +644,25 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       of ' ':
         stopTagName = true
         lex.strbuf.add(lex.current)
+        lex.advance()
       of 'a'..'z', 'A'..'Z', '0'..'9', '_', '-':
         lex.strbuf.add(lex.current)
         if not stopTagName:
           tag.add(lex.current)
+        lex.advance()
       else:
         lex.strbuf.add(lex.current)
-      lex.advance()
-    if lex.current == '>':
-      lex.strbuf.add(lex.current)
-      lex.advance()
-    # now consume until outermost closing tag
-    # TODO test for self-closing tags
+        lex.advance()
+    # Check for self-closing tag (e.g., <br/> or <br />)
+    let isSelfClosing = block:
+      var found = false
+      var i = lex.strbuf.len - 2  # skip trailing '>'
+      while i >= 0 and lex.strbuf[i] in {' ', '\t'}:
+        dec i
+      found = i >= 0 and lex.strbuf[i] == '/'
+      found
     var htmlContent = lex.strbuf
-    var depth = 1
+    var depth = if isSelfClosing: 0 else: 1
     while depth > 0 and lex.current != '\0':
       if lex.current == '<':
         if lex.peek() == '/':
@@ -532,8 +696,21 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkHtml, htmlContent, attrs=some(@[tag]))
   of '|':
     lex.advance()
-    skipWhitespace(lex) # skip spaces after '|'
     return newTokenTuple(lex, mtkTable, "|")
+  of '\\':
+    # Backslash escape — produce the literal next character
+    lex.advance()
+    if lex.current in {'!', '"', '#', '$', '%', '&', '\'', '(', ')',
+                        '*', '+', ',', '-', '.', '/', ':', ';', '<',
+                        '=', '>', '?', '@', '[', '\\', ']', '^', '_',
+                        '`', '{', '|', '}', '~'}:
+      let ch = $lex.current
+      lex.advance()
+      return newTokenTuple(lex, mtkText, ch)
+    else:
+      # Not escapable — emit literal backslash
+      lex.advance()
+      return newTokenTuple(lex, mtkText, "\\")
   else:
     # Paragraph or plain text
     # Scan for auto links anywhere in the text

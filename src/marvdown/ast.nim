@@ -21,6 +21,7 @@ type
     mdkImage,          # Image
     mdkEmphasis,       # Emphasized text (italic)
     mdkStrong,         # Strongly emphasized text (bold)
+    mdkStrikethrough,  # Strikethrough text (~~text~~)
     mdkInlineCode,     # Inline code
     mdkLineBreak,      # Line break
     mdkHtml,           # Raw HTML content
