@@ -81,6 +81,14 @@ type
       ## tags to `data-src` so they are only fetched when a client-side
       ## script swaps them back (e.g., via IntersectionObserver).
       ## Default: false
+    lazyloadVideos*: bool
+      ## Lazy-load videos and audio by rewriting the `src` attribute of
+      ## `<video>`, `<audio>` and `<source>` tags to `data-src`.
+      ## Default: false
+    lazyloadImages*: bool
+      ## Lazy-load images by rewriting the `src` attribute of `<img>` tags
+      ## to `data-src`. Applies to both raw HTML and Markdown image syntax.
+      ## Default: false
 
 #
 # forward declarations
@@ -780,20 +788,22 @@ let defaultOptions = MarkdownOptions(
   enableEmailAutolinks: false
 )
 
-proc lazyloadIframeSrc*(html: sink string): string =
-  ## Rewrites the `src` attribute of `<iframe>` opening tags to `data-src`
-  ## so iframes are not loaded until a client-side script swaps them back.
+proc lazyloadMediaSrc*(html: sink string, tagName: string): string =
+  ## Rewrites the `src` attribute of `<tagName>` opening tags to `data-src`
+  ## so the media is not loaded until a client-side script swaps it back.
   ## Leaves the rest of the HTML untouched.
   result = html
   if result.len == 0:
     return
+  let tagPrefix = "<" & tagName
+  let prefixLen = tagPrefix.len
   var i = 0
   while i < result.len:
-    let iframeStart = result.find("<iframe", i)
-    if iframeStart < 0:
+    let tagStart = result.find(tagPrefix, i)
+    if tagStart < 0:
       break
-    # Find the end of the `<iframe ...>` opening tag, respecting quotes
-    var tagEnd = iframeStart + 7
+    # Find the end of the `<tagName ...>` opening tag, respecting quotes
+    var tagEnd = tagStart + prefixLen
     var quote: char
     while tagEnd < result.len and result[tagEnd] != '>':
       if result[tagEnd] in {'"', '\''}:
@@ -801,7 +811,7 @@ proc lazyloadIframeSrc*(html: sink string): string =
         elif quote == result[tagEnd]: quote = '\0'
       inc tagEnd
     # Scan for the `src` attribute inside the opening tag
-    var j = iframeStart + 7
+    var j = tagStart + prefixLen
     while j < tagEnd:
       if result[j] in {'s', 'S'}:
         if j + 2 < result.len and result[j + 1] in {'r', 'R'} and result[j + 2] in {'c', 'C'}:
@@ -945,10 +955,17 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
           continue
       let htmlNode = MarkdownNode(
         kind: mdkHtml,
-        html: if md.opts.lazyloadIframes:
-                lazyloadIframeSrc(curr.token)
-              else:
-                curr.token,
+        html: block:
+          var content = curr.token
+          if md.opts.lazyloadIframes:
+            content = lazyloadMediaSrc(content, "iframe")
+          if md.opts.lazyloadVideos:
+            content = lazyloadMediaSrc(content, "video")
+            content = lazyloadMediaSrc(content, "source")
+            content = lazyloadMediaSrc(content, "audio")
+          if md.opts.lazyloadImages:
+            content = lazyloadMediaSrc(content, "img")
+          content,
         line: curr.line
       )
       if tagType notin blockLevelTags:
@@ -1349,7 +1366,10 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
       else:
         a(href=node.linkHref, linkContent)
   of mdkImage:
-    result = img(src=node.imageSrc, alt=node.imageAlt, title=node.imageTitle)
+    if md.opts.lazyloadImages:
+      result = "<img data-src=\"" & node.imageSrc & "\" alt=\"" & node.imageAlt & "\" title=\"" & node.imageTitle & "\" />"
+    else:
+      result = img(src=node.imageSrc, alt=node.imageAlt, title=node.imageTitle)
   of mdkList:
     var listItems = ""
     for item in node.children.items:

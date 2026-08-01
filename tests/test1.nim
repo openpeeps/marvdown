@@ -49,6 +49,18 @@ let noLazyloadIframes = MarkdownOptions(
   lazyloadIframes: false
 )
 
+let withLazyloadVideos = MarkdownOptions(
+  allowed: @[tagVideo, tagAudio, tagSource, tagDiv],
+  enableAnchors: false,
+  lazyloadVideos: true
+)
+
+let withLazyloadImages = MarkdownOptions(
+  allowed: @[tagImg, tagDiv],
+  enableAnchors: false,
+  lazyloadImages: true
+)
+
 suite "basics":
   test "headings with anchors":
     let sample = """
@@ -432,6 +444,63 @@ suite "lazyload_iframes":
     let sample = "<div>content</div>"
     var md = newMarkdown(sample, withLazyloadIframes)
     assert md.toHtml() == "<div>content</div>"
+
+suite "lazyload_videos":
+  test "video src rewritten to data-src":
+    let sample = "<video src=\"https://example.com/video.mp4\"></video>"
+    var md = newMarkdown(sample, withLazyloadVideos)
+    assert md.toHtml() == "<p><video data-src=\"https://example.com/video.mp4\"></video></p>"
+
+  test "video source src rewritten to data-src":
+    let sample = "<video><source src=\"https://example.com/video.mp4\"></video>"
+    var md = newMarkdown(sample, withLazyloadVideos)
+    assert md.toHtml() == "<p><video><source data-src=\"https://example.com/video.mp4\"></video></p>"
+
+  test "audio src rewritten to data-src":
+    let sample = "<audio src=\"https://example.com/audio.mp3\"></audio>"
+    var md = newMarkdown(sample, withLazyloadVideos)
+    assert md.toHtml() == "<p><audio data-src=\"https://example.com/audio.mp3\"></audio></p>"
+
+  test "video with attributes rewritten":
+    let sample = "<video width=\"640\" src=\"https://example.com/video.mp4\" controls></video>"
+    var md = newMarkdown(sample, withLazyloadVideos)
+    assert md.toHtml() == "<p><video width=\"640\" data-src=\"https://example.com/video.mp4\" controls></video></p>"
+
+  test "video not affected when option off":
+    let sample = "<video src=\"https://example.com/video.mp4\"></video>"
+    var md = newMarkdown(sample, noLazyloadIframes)
+    assert md.toHtml() == "<p><video src=\"https://example.com/video.mp4\"></video></p>"
+
+suite "lazyload_images":
+  test "raw html img src rewritten to data-src":
+    let sample = "<img src=\"https://example.com/image.png\" alt=\"alt\">"
+    var md = newMarkdown(sample, withLazyloadImages)
+    assert md.toHtml() == "<p><img data-src=\"https://example.com/image.png\" alt=\"alt\"></p>"
+
+  test "nested raw html img rewritten to data-src":
+    let sample = "<div><img src=\"https://example.com/image.png\" alt=\"alt\"></div>"
+    var md = newMarkdown(sample, withLazyloadImages)
+    assert md.toHtml() == "<div><img data-src=\"https://example.com/image.png\" alt=\"alt\"></div>"
+
+  test "markdown image rewritten to data-src":
+    let sample = "![alt](https://example.com/image.png)"
+    var md = newMarkdown(sample, withLazyloadImages)
+    assert md.toHtml() == "<img data-src=\"https://example.com/image.png\" alt=\"alt\" title=\"\" />"
+
+  test "markdown image with title rewritten to data-src":
+    let sample = "![alt](https://example.com/image.png \"Title\")"
+    var md = newMarkdown(sample, withLazyloadImages)
+    assert md.toHtml() == "<img data-src=\"https://example.com/image.png\" alt=\"alt\" title=\"Title\" />"
+
+  test "img not affected when option off":
+    let sample = "<img src=\"https://example.com/image.png\" alt=\"alt\">"
+    var md = newMarkdown(sample, noLazyloadIframes)
+    assert md.toHtml() == "<p><img src=\"https://example.com/image.png\" alt=\"alt\"></p>"
+
+  test "markdown image not affected when option off":
+    let sample = "![alt](https://example.com/image.png)"
+    var md = newMarkdown(sample, opts)
+    assert md.toHtml() == "<img src=\"https://example.com/image.png\" alt=\"alt\" title=\"\" />"
 
 suite "components":
   test "include markdown":
