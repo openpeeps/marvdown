@@ -1,6 +1,7 @@
 import unittest, options, strutils, tables
 import marvdown
 import pkg/openparser/yaml as yamlmod
+import std/os
 
 let opts = MarkdownOptions(
   allowed: @[
@@ -25,6 +26,27 @@ let withEmailAutolinks = MarkdownOptions(
   allowed: opts.allowed,
   enableAnchors: false,
   enableEmailAutolinks: true
+)
+
+let fixturesDir = absolutePath("tests/fixtures")
+
+let componentOpts = MarkdownOptions(
+  allowed: opts.allowed,
+  enableAnchors: false,
+  enableComponents: true,
+  componentBaseDir: fixturesDir
+)
+
+let withLazyloadIframes = MarkdownOptions(
+  allowed: @[tagIframe, tagDiv],
+  enableAnchors: false,
+  lazyloadIframes: true
+)
+
+let noLazyloadIframes = MarkdownOptions(
+  allowed: @[tagIframe, tagDiv],
+  enableAnchors: false,
+  lazyloadIframes: false
 )
 
 suite "basics":
@@ -374,3 +396,93 @@ suite "reference_links":
     let sample = "[ref]: <https://example.com>\n\n[link][ref]"
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == """<p><a href="https://example.com">link</a></p>"""
+
+suite "lazyload_iframes":
+  test "iframe src rewritten to data-src":
+    let sample = "<iframe src=\"https://example.com/embed\"></iframe>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<p><iframe data-src=\"https://example.com/embed\"></iframe></p>"
+
+  test "iframe src with attributes rewritten":
+    let sample = "<iframe width=\"560\" src=\"https://example.com/embed\" height=\"315\"></iframe>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<p><iframe width=\"560\" data-src=\"https://example.com/embed\" height=\"315\"></iframe></p>"
+
+  test "existing data-src is not double-rewritten":
+    let sample = "<iframe data-src=\"https://example.com/embed\"></iframe>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<p><iframe data-src=\"https://example.com/embed\"></iframe></p>"
+
+  test "srcdoc and srcset are untouched":
+    let sample = "<iframe src=\"https://example.com/embed\" srcdoc=\"<p>hi</p>\" srcset=\"x\"></iframe>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<p><iframe data-src=\"https://example.com/embed\" srcdoc=\"<p>hi</p>\" srcset=\"x\"></iframe></p>"
+
+  test "nested iframe inside block is rewritten":
+    let sample = "<div><iframe src=\"https://example.com/embed\"></iframe></div>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<div><iframe data-src=\"https://example.com/embed\"></iframe></div>"
+
+  test "option off passes iframe through unchanged":
+    let sample = "<iframe src=\"https://example.com/embed\"></iframe>"
+    var md = newMarkdown(sample, noLazyloadIframes)
+    assert md.toHtml() == "<p><iframe src=\"https://example.com/embed\"></iframe></p>"
+
+  test "other html is unaffected when option enabled":
+    let sample = "<div>content</div>"
+    var md = newMarkdown(sample, withLazyloadIframes)
+    assert md.toHtml() == "<div>content</div>"
+
+suite "components":
+  test "include markdown":
+    let sample = "Hello @include(\"simple.md\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<p>Hello world</p>"
+
+  test "include html":
+    let sample = "@include(\"attrs.html\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<div>body</div>"
+
+  test "attr extraction and variable resolution":
+    let sample = "@include(\"greeting.html\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<div><h1>Hello</h1><p>Welcome to the test</p></div>"
+    assert md.scope["title"] == "Hello"
+    assert md.scope["desc"] == "Welcome to the test"
+
+  test "attr boolean and hyphenated":
+    let sample = "@include(\"attrs.html\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.scope["data-value"] == "123"
+    assert md.scope["enabled"] == "true"
+
+  test "variable fallback":
+    let sample = "@include(\"fallback.html\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<p>$unknown</p>"
+
+  test "dollar escape":
+    let sample = "@include(\"dollar.html\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<p>$literal</p>"
+
+  test "nested include":
+    let sample = "@include(\"nested/inner.md\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml() == "<p>inner world</p>"
+
+  test "circular include":
+    let sample = "@include(\"circular_a.md\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml().contains("circular")
+
+  test "fenced code block skip":
+    let sample = "@include(\"code.md\")"
+    var md = newMarkdown(sample, componentOpts)
+    assert md.toHtml().contains("@include(&quot;simple.md&quot;)")
+
+  test "components disabled passes through":
+    let sample = "Hello @include(\"simple.md\")"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>Hello @include(\"simple.md\")</p>"

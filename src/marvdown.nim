@@ -6,8 +6,8 @@
 
 # Use Marvdown as Nimble library
 import std/xmltree
-import ./marvdown/[parser, ast]
-export parser, ast
+import ./marvdown/[parser, ast, components]
+export parser, ast, components
 
 export hasSelectors, getSelectors, getTitle
 
@@ -80,7 +80,9 @@ elif isMainModule:
           tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
           tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
           tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
-        enableAnchors: v.has("--optAnchors")
+        enableAnchors: v.has("--optAnchors"),
+        enableComponents: v.has("--components"),
+        componentBaseDir: filePath.parentDir()
       )
       t = cpuTime() # start timer after reading file
 
@@ -132,7 +134,8 @@ elif isMainModule:
     commands:
       html path(md), ?filename(output),
         ?bool("--optAnchors"),
-        ?bool("--bench"):
+        ?bool("--bench"),
+        ?bool("--components"):
           ## Write a markdown document to HTML
       
       json path(md):

@@ -4,12 +4,12 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/marvdown
 
-import std/[strutils, sequtils, options, tables, unicode, unidecode]
+import std/[strutils, sequtils, options, tables, unicode, unidecode, os]
 import pkg/openparser/[json, yaml, html]
 
 export HtmlTag
 
-import ./lexer, ./ast
+import ./lexer, ./ast, ./components
 
 type
   MarkdownParser* = object
@@ -38,6 +38,8 @@ type
       ## Generated HTML for footnotes at the end of the document
     linkDefs*: TableRef[string, tuple[url, title: string]]
       ## Link definitions collected from the document (pre-scan)
+    scope*: ComponentScope
+      ## Component scope: variables set by @attr in imported HTML
 
   TagType* = enum
     tagNone,       # No tags allowed
@@ -69,6 +71,16 @@ type
       ## Optional CSS classes to add to generated HTML tables (e.g., `["table", "table-striped"]` for Bootstrap tables)
     enableEmailAutolinks*: bool
       ## Enable email autolinks in angle brackets (e.g., `<user@example.com>`)
+    enableComponents*: bool
+      ## Enable @include() directives and @attr/$variable in imported HTML
+    componentBaseDir*: string
+      ## Base directory for resolving @include() paths. If empty,
+      ## resolves relative to the current working directory.
+    lazyloadIframes*: bool
+      ## Lazy-load iframes by rewriting the `src` attribute of `<iframe>`
+      ## tags to `data-src` so they are only fetched when a client-side
+      ## script swaps them back (e.g., via IntersectionObserver).
+      ## Default: false
 
 #
 # forward declarations
@@ -768,6 +780,42 @@ let defaultOptions = MarkdownOptions(
   enableEmailAutolinks: false
 )
 
+proc lazyloadIframeSrc*(html: sink string): string =
+  ## Rewrites the `src` attribute of `<iframe>` opening tags to `data-src`
+  ## so iframes are not loaded until a client-side script swaps them back.
+  ## Leaves the rest of the HTML untouched.
+  result = html
+  if result.len == 0:
+    return
+  var i = 0
+  while i < result.len:
+    let iframeStart = result.find("<iframe", i)
+    if iframeStart < 0:
+      break
+    # Find the end of the `<iframe ...>` opening tag, respecting quotes
+    var tagEnd = iframeStart + 7
+    var quote: char
+    while tagEnd < result.len and result[tagEnd] != '>':
+      if result[tagEnd] in {'"', '\''}:
+        if quote == '\0': quote = result[tagEnd]
+        elif quote == result[tagEnd]: quote = '\0'
+      inc tagEnd
+    # Scan for the `src` attribute inside the opening tag
+    var j = iframeStart + 7
+    while j < tagEnd:
+      if result[j] in {'s', 'S'}:
+        if j + 2 < result.len and result[j + 1] in {'r', 'R'} and result[j + 2] in {'c', 'C'}:
+          let prev = if j > 0: result[j - 1] else: ' '
+          let next = if j + 3 < tagEnd: result[j + 3] else: '='
+          # Match `src` as an attribute name: preceded by whitespace and
+          # followed by `=` or whitespace (skips `data-src`, `srcset`, `srcdoc`)
+          if prev in {' ', '\t', '\n', '\r'} and next in {' ', '\t', '='}:
+            result = result[0 ..< j] & "data-" & result[j .. ^1]
+            inc tagEnd, 5
+            break
+      inc j
+    i = tagEnd + 1
+
 proc parseFootnoteDef(md: var Markdown): MarkdownNode = 
   ## Parse a footnote definition into a MarkdownNode
   let id = md.parser.curr.attrs.get()[0]
@@ -897,7 +945,10 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
           continue
       let htmlNode = MarkdownNode(
         kind: mdkHtml,
-        html: curr.token,
+        html: if md.opts.lazyloadIframes:
+                lazyloadIframeSrc(curr.token)
+              else:
+                curr.token,
         line: curr.line
       )
       if tagType notin blockLevelTags:
@@ -1034,13 +1085,26 @@ proc collectLinkDefs(content: string): TableRef[string, tuple[url, title: string
 proc newMarkdown*(content: sink string,
               opts: MarkdownOptions = defaultOptions): Markdown =
   ## Create a new Markdown instance
+  var processedContent = content
+  var scope: ComponentScope = nil
+
+  if opts.enableComponents:
+    scope = newComponentScope()
+    let basePath =
+      if opts.componentBaseDir.len > 0: opts.componentBaseDir
+      else: getCurrentDir()
+    var visited: seq[string] = @[]
+    processedContent = preprocess(processedContent, basePath, scope, visited)
+
   var md = Markdown(
-    parser: MarkdownParser(lexer: initLexer(content, opts.enableEmailAutolinks)),
+    parser: MarkdownParser(lexer: initLexer(processedContent, opts.enableEmailAutolinks)),
     opts: opts,
-    linkDefs: collectLinkDefs(content),
+    linkDefs: collectLinkDefs(processedContent),
     selectors: newOrderedTable[string, string](),
     selectorCounter: newCountTable[string]()
   )
+  if opts.enableComponents:
+    md.scope = scope
   md.parser.curr = md.parser.lexer.nextToken()
   md.parser.next = md.parser.lexer.nextToken()
 
