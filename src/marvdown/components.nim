@@ -179,3 +179,61 @@ proc preprocess*(content: string, basePath: string, scope: var ComponentScope, v
           inFence = false
   if result.endsWith("\n"):
     result.setLen(result.len - 1)
+
+proc transformLines*(content: string,
+                     transform: proc(line: string): string): string =
+  ## Applies a custom per-line parsing hook to `content`, skipping fenced code
+  ## blocks and the leading YAML front matter block. `transform` receives each
+  ## body line and may return a replacement (possibly raw HTML). Returns the
+  ## transformed content.
+  result = newStringOfCap(content.len)
+  var lines = content.splitLines()
+  var i = 0
+  # skip the leading YAML front matter block (`---` ... `---`)
+  if lines.len > 1 and lines[0].strip() == "---" and lines[1].strip().len > 0:
+    result.add(lines[0] & "\n")
+    inc i
+    while i < lines.len and lines[i].strip() != "---":
+      result.add(lines[i] & "\n")
+      inc i
+    if i < lines.len:
+      result.add(lines[i] & "\n") # closing `---`
+      inc i
+  var inFence = false
+  var fenceChar: char = '\0'
+  var fenceLen = 0
+  while i < lines.len:
+    let line = lines[i]
+    if not inFence:
+      var j = 0
+      while j < line.len and line[j] == ' ' and j < 3:
+        inc j
+      if j < line.len and line[j] in {'`', '~'}:
+        let fc = line[j]
+        var fl = 0
+        while j < line.len and line[j] == fc:
+          inc fl
+          inc j
+        if fl >= 3:
+          inFence = true
+          fenceChar = fc
+          fenceLen = fl
+          result.add(line & "\n")
+          inc i
+          continue
+      result.add(transform(line) & "\n")
+    else:
+      result.add(line & "\n")
+      var j = 0
+      while j < line.len and line[j] == ' ' and j < 3:
+        inc j
+      if j < line.len and line[j] == fenceChar:
+        var cl = 0
+        while j < line.len and line[j] == fenceChar:
+          inc cl
+          inc j
+        if cl >= fenceLen:
+          inFence = false
+    inc i
+  if result.endsWith("\n"):
+    result.setLen(result.len - 1)

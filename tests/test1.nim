@@ -555,3 +555,47 @@ suite "components":
     let sample = "Hello @include(\"simple.md\")"
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<p>Hello @include(\"simple.md\")</p>"
+
+let transformOpts = MarkdownOptions(
+  allowed: opts.allowed,
+  enableAnchors: false,
+  customTransform: proc(line: string): string =
+    line.replace("@foo", "<span class=\"ref\">foo</span>")
+)
+
+let cardOpts = MarkdownOptions(
+  allowed: opts.allowed,
+  enableAnchors: false,
+  customTransform: proc(line: string): string =
+    if line == "@card": "<div class=\"card\">Card</div>" else: line
+)
+
+suite "customTransform":
+  test "inline text replacement":
+    let sample = "See @foo here"
+    var md = newMarkdown(sample, transformOpts)
+    assert md.toHtml() == "<p>See </p><p><span class=\"ref\">foo</span> here</p>"
+
+  test "block-level HTML on its own line":
+    let sample = "Before\n\n@card\n\nAfter"
+    var md = newMarkdown(sample, cardOpts)
+    assert md.toHtml() == "<p>Before</p><div class=\"card\">Card</div><p>After</p>"
+
+  test "fenced code blocks are skipped":
+    let sample = "```\n@foo\n```"
+    var md = newMarkdown(sample, transformOpts)
+    assert md.toHtml().contains("@foo")
+    assert not md.toHtml().contains("class=\"ref\"")
+
+  test "front matter is skipped":
+    let sample = "---\nsummary: \"@foo\"\n---\n\nBody @foo"
+    var md = newMarkdown(sample, transformOpts)
+    let h = md.getHeader()
+    assert not h.isNil
+    assert yamlmod.getStr(h["summary"]) == "@foo"
+    assert md.toHtml().contains("<span class=\"ref\">foo</span>")
+
+  test "disabled when the hook is nil":
+    let sample = "See @foo here"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>See @foo here</p>"

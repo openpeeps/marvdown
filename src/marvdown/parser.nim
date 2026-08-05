@@ -76,6 +76,13 @@ type
     componentBaseDir*: string
       ## Base directory for resolving @include() paths. If empty,
       ## resolves relative to the current working directory.
+    customTransform*: proc(line: string): string
+      ## Optional per-line parsing hook. Called for every body line (outside
+      ## fenced code blocks and the leading YAML front matter) before lexing.
+      ## Return a different string (possibly raw HTML) to replace the line;
+      ## return the input unchanged to keep it. Useful for custom syntax like
+      ## `@hello-world.md` that should render as rich HTML (e.g. a card) built
+      ## by the consumer. Default: nil (disabled).
     lazyloadIframes*: bool
       ## Lazy-load iframes by rewriting the `src` attribute of `<iframe>`
       ## tags to `data-src` so they are only fetched when a client-side
@@ -1112,6 +1119,9 @@ proc newMarkdown*(content: sink string,
       else: getCurrentDir()
     var visited: seq[string] = @[]
     processedContent = preprocess(processedContent, basePath, scope, visited)
+
+  if opts.customTransform != nil:
+    processedContent = transformLines(processedContent, opts.customTransform)
 
   var md = Markdown(
     parser: MarkdownParser(lexer: initLexer(processedContent, opts.enableEmailAutolinks)),
