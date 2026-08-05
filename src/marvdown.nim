@@ -9,7 +9,7 @@ import std/xmltree
 import ./marvdown/[parser, ast, components]
 export parser, ast, components
 
-export hasSelectors, getSelectors, getTitle
+export hasSelectors, getSelectors, getSelectorItems, getTitle
 
 proc toHtml*(content: sink string): owned string =
   ## Convert Markdown content to HTML

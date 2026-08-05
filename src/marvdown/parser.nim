@@ -26,6 +26,8 @@ type
       ## Options for allowed HTML tags and attributes
     selectors: OrderedTableRef[string, string]
       ## Internal: Used for generating unique headline anchors
+    selectorLevels: OrderedTableRef[string, int]
+      ## Internal: Heading level (1-6) for each generated anchor
     selectorCounter: CountTableRef[string]
       ## Internal: Counter for generating unique selectors
     ast*: seq[MarkdownNode]
@@ -1128,6 +1130,7 @@ proc newMarkdown*(content: sink string,
     opts: opts,
     linkDefs: collectLinkDefs(processedContent),
     selectors: newOrderedTable[string, string](),
+    selectorLevels: newOrderedTable[string, int](),
     selectorCounter: newCountTable[string]()
   )
   if opts.enableComponents:
@@ -1155,6 +1158,13 @@ proc toJson*(md: Markdown): string =
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
   md.selectors
+
+proc getSelectorItems*(md: Markdown): seq[tuple[level: int, anchor, title: string]] =
+  ## Get the headline selectors with their heading levels (1-6),
+  ## in document order. Useful for building nested tables of contents.
+  for anchor, title in md.selectors:
+    result.add((level: md.selectorLevels.getOrDefault(anchor, 2),
+                anchor: anchor, title: title))
 
 proc getSelectorsList*(md: Markdown): seq[string] =
   ## Get a sequence of headline selector values from the parsed Markdown
@@ -1412,9 +1422,11 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
         md.selectorCounter[anchor] = count
         anchor.add("-" & $count)
         md.selectors[anchor] = title
+        md.selectorLevels[anchor] = node.level
       else: # first occurrence
         md.selectorCounter[anchor] = 1
         md.selectors[anchor] = title
+        md.selectorLevels[anchor] = node.level
       let anchorlink =
             a(href="#" & anchor, `class`="anchor-link",
                     md.opts.anchorIcon)
