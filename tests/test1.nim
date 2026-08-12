@@ -188,6 +188,62 @@ echo "hi"
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<p>First para.</p><p>Second para.</p>"
 
+suite "alerts":
+  test "warning alert":
+    let sample = "> [!WARNING]\n> The library is not production-ready."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<div class=\"alert alert-warning rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">The library is not production-ready.</div></div>"
+
+  test "note alert":
+    let sample = "> [!NOTE]\n> Plain note here."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<div class=\"alert alert-info rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">Plain note here.</div></div>"
+
+  test "tip alert":
+    let sample = "> [!TIP]\n> Use this trick."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<div class=\"alert alert-success rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">Use this trick.</div></div>"
+
+  test "important alert":
+    let sample = "> [!IMPORTANT]\n> Read carefully."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<div class=\"alert alert-primary rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">Read carefully.</div></div>"
+
+  test "caution alert":
+    let sample = "> [!CAUTION]\n> Handle with care."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<div class=\"alert alert-danger rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">Handle with care.</div></div>"
+
+  test "alert multi-line content with inline formatting":
+    let sample = "> [!WARNING]\n> Some **bold** and `code` here,\n> wrapped over two lines."
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html.startsWith("<div class=\"alert alert-warning rounded-4\" role=\"alert\"><div class=\"alert-content\">")
+    assert html.contains("<strong>bold</strong>")
+    assert html.contains("<code>code</code>")
+    assert html.contains("wrapped over two lines")
+    assert not html.contains("[!WARNING]")
+
+  test "plain blockquote unaffected":
+    let sample = "> A wise quote."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote>A wise quote.</blockquote>"
+
+  test "unknown marker stays a blockquote":
+    let sample = "> [!FOO]\n> Not an alert."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote>[!FOO]Not an alert.</blockquote>"
+
 suite "extensions":
   test "yaml front matter":
     let sample = "---\ntitle: Test\n---\n\n# Hello"

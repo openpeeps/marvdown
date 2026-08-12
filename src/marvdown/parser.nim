@@ -511,8 +511,14 @@ proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
           children: MarkdownNodeList(),
           line: curr.line
         )
-        for n in md.parseInline(textVal):
-          linkNode.children.items.add(n)
+        if textVal == hrefVal:
+          # Autolink (or `[url](url)`): the display text is the URL itself.
+          # Re-parsing it would recursively detect the same autolink, so use
+          # the plain text directly.
+          linkNode.children.items.add(textNode)
+        else:
+          for n in md.parseInline(textVal):
+            linkNode.children.items.add(n)
         result.add(linkNode)
       curr = lex.nextToken()
     of mtkRefLink:
@@ -628,12 +634,34 @@ proc parseList(md: var Markdown): MarkdownNode =
     skipWhitespaceTokens(md)
 
 proc parseBlockquote(md: var Markdown): MarkdownNode =
-  # Parse one or more consecutive blockquote tokens into a blockquote node
-  result = MarkdownNode(
-    kind: mdkBlockquote,
-    children: MarkdownNodeList(items: @[]),
-    line: md.parser.curr.line
-  )
+  # Parse one or more consecutive blockquote tokens into a blockquote node.
+  # A GitHub-style alert (`> [!NOTE]` / `> [!WARNING]` …) becomes an mdkAlert
+  # node whose content excludes the marker line.
+  let firstText = md.parser.curr.token.strip()
+  var alertType = ""
+  if firstText.len >= 4 and firstText[0] == '[' and firstText[1] == '!':
+    # `[!TYPE]` — read the identifier up to the closing bracket
+    var j = 2
+    while j < firstText.len and firstText[j] in IdentChars:
+      inc j
+    if j < firstText.len and firstText[j] == ']' and j == firstText.len - 1:
+      let t = firstText[2 ..< j].toUpperAscii
+      if t in ["NOTE", "TIP", "IMPORTANT", "WARNING", "CAUTION"]:
+        alertType = t
+  if alertType.len > 0:
+    result = MarkdownNode(
+      kind: mdkAlert,
+      alertType: alertType,
+      children: MarkdownNodeList(items: @[]),
+      line: md.parser.curr.line
+    )
+    md.advance() # consume the `[!TYPE]` marker line
+  else:
+    result = MarkdownNode(
+      kind: mdkBlockquote,
+      children: MarkdownNodeList(items: @[]),
+      line: md.parser.curr.line
+    )
   # Collect all consecutive blockquote lines as inline content
   while md.parser.curr.kind == mtkBlockquote:
     let quoteText = md.parser.curr.token.strip()
@@ -1484,6 +1512,23 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
     for child in node.children.items:
       bqContent.add(md.renderNode(child))
     result = blockquote(bqContent)
+  of mdkAlert:
+    # GitHub-style alert: `> [!NOTE]` … rendered as a Bootstrap alert.
+    # Type -> Bootstrap alert class (GFM convention).
+    let cssClass =
+      case node.alertType
+      of "NOTE":       "info"
+      of "TIP":        "success"
+      of "IMPORTANT":  "primary"
+      of "WARNING":    "warning"
+      of "CAUTION":    "danger"
+      else:            "info"
+    var alertContent = ""
+    for child in node.children.items:
+      alertContent.add(md.renderNode(child))
+    result = "<div class=\"alert alert-" & cssClass &
+      " rounded-4\" role=\"alert\">" &
+      "<div class=\"alert-content\">" & alertContent & "</div></div>"
   of mdkTable:
     var html: string
     if md.opts.htmlTableClasses.isSome:

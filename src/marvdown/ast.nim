@@ -16,6 +16,7 @@ type
     mdkList,           # Ordered or unordered list
     mdkListItem,       # List item
     mdkBlockquote,     # Blockquote
+    mdkAlert,          # Alert (GitHub-style `> [!NOTE]` blockquote)
     mdkHorizontalRule, # Horizontal rule (--- or ***)
     mdkLink,           # Hyperlink
     mdkImage,          # Image
@@ -90,6 +91,10 @@ type
     of mdkFootnoteDef:
       footnoteId*: string
         ## Identifier for the footnote definition
+    of mdkAlert:
+      alertType*: string
+        ## Alert type (NOTE, TIP, IMPORTANT, WARNING, CAUTION) used to
+        ## select the Bootstrap alert class
     else: discard
     children*: MarkdownNodeList
       ## Child nodes (for container nodes)

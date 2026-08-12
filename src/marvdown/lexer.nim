@@ -159,6 +159,63 @@ proc skipWhitespace(lex: var MarkdownLexer) =
     lex.advance()
     inc lex.col
 
+proc atLineStart(lex: MarkdownLexer): bool =
+  ## True when the current position is the first non-whitespace character
+  ## on its line (allowing leading indentation). Used to distinguish list
+  ## markers (`-`, `+`) from mid-line dashes/pluses, e.g. inside table cells.
+  var p = lex.pos - 1
+  while p >= 0 and lex.input[p] in {' ', '\t'}:
+    dec p
+  result = p < 0 or lex.input[p] in {'\n', '\r'}
+
+proc isListMarkerAt(lex: MarkdownLexer, pos: int): bool =
+  ## True when the input at `pos` begins a list-item marker: `- `, `+ `,
+  ## `* ` or `1. ` (with optional leading whitespace before the marker).
+  var p = pos
+  while p < lex.input.len and lex.input[p] in {' ', '\t'}:
+    inc p
+  if p >= lex.input.len:
+    return false
+  case lex.input[p]
+  of '-', '+', '*':
+    result = p + 1 < lex.input.len and lex.input[p + 1] in {' ', '\t'}
+  of '0'..'9':
+    var j = p
+    while j < lex.input.len and lex.input[j] in {'0'..'9'}:
+      inc j
+    result = j + 1 < lex.input.len and lex.input[j] == '.' and
+             lex.input[j + 1] in {' ', '\t'}
+  else:
+    result = false
+
+proc readListContinuation(lex: var MarkdownLexer) =
+  ## Folds subsequent indented lines that are continuations of a list item
+  ## into the item text stored in `strbuf` (joined with a single space).
+  ## A continuation line must be indented, non-blank, and must not begin
+  ## with a new list marker (so nested lists stay separate).
+  while lex.current in {'\n', '\r'}:
+    var p = lex.pos
+    while p < lex.input.len and lex.input[p] in {'\n', '\r'}:
+      inc p
+    var indent = 0
+    while p < lex.input.len and lex.input[p] in {' ', '\t'}:
+      inc indent
+      inc p
+    if p >= lex.input.len or lex.input[p] in {'\n', '\r'}:
+      break # EOF or blank line
+    if indent == 0 or lex.isListMarkerAt(p):
+      break # not a continuation
+    # consume the newline and the leading whitespace
+    while lex.current in {'\n', '\r'}:
+      lex.advance()
+    while lex.current in {' ', '\t'}:
+      lex.advance()
+    # append the continuation line
+    lex.strbuf.add(' ')
+    while lex.current notin {'\n', '\r', '\0'}:
+      lex.strbuf.add(lex.current)
+      lex.advance()
+
 const newSpace = " "
 proc scanTextWithLinks(lex: var MarkdownLexer): seq[MarkdownTokenTuple] =
   var buf = ""
@@ -290,6 +347,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   of '-', '_':
     # Horizontal rule or unordered list or emphasis/strong
     let indentCol = lex.col
+    let atLineStartMark = atLineStart(lex)
     let ch = lex.current
     var count = 0
     while lex.current == ch:
@@ -329,7 +387,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
             return newTokenTuple(lex, mtkDocument, lex.strbuf.strip())
         return newTokenTuple(lex, mtkHorizontalRule, repeat(ch, count))
 
-    if ch == '-' and (lex.current == ' ' or lex.current == '\t'):
+    if atLineStartMark and ch == '-' and (lex.current == ' ' or lex.current == '\t'):
       # Unordered list item; '*' and '+' have their own handlers
       lex.advance()
       skipWhitespace(lex)
@@ -347,6 +405,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
           while lex.current notin {'\n', '\r', '\0'}:
             lex.strbuf.add(lex.current)
             lex.advance()
+          lex.readListContinuation()
           let checkState =
             if cbChar == 'x': "checked"
                         else: "unchecked"
@@ -360,6 +419,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
+      lex.readListContinuation()
       result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
       result.indent = indentCol
       return result
@@ -399,6 +459,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
+      lex.readListContinuation()
       result = newTokenTuple(lex, mtkOListItem, lex.strbuf.strip(), attrs=some(@[startNum]))
       result.indent = indentCol
       return result
@@ -667,6 +728,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
+      lex.readListContinuation()
       result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
       result.indent = indentCol
       return result
@@ -695,13 +757,15 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   of '+':
     # Unordered list item (e.g., "+ item")
     let indentCol = lex.col
+    let atLineStartMark = atLineStart(lex)
     lex.advance()
-    if lex.current == ' ' or lex.current == '\t':
+    if atLineStartMark and (lex.current == ' ' or lex.current == '\t'):
       skipWhitespace(lex)
       lex.strbuf.setLen(0)
       while lex.current notin {'\n', '\r', '\0'}:
         lex.strbuf.add(lex.current)
         lex.advance()
+      lex.readListContinuation()
       result = newTokenTuple(lex, mtkListItem, lex.strbuf.strip())
       result.indent = indentCol
       return result
