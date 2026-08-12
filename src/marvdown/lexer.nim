@@ -426,8 +426,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
 
     if ch == '_':
       # Emphasis or strong with underscore
-      if lex.peek() == '_':
-        lex.advance(); lex.advance()
+      # NOTE: the counting loop above already consumed all underscore chars,
+      # so use `count` (not `peek`) to decide between strong and emphasis.
+      if count >= 2:
         return newTokenTuple(lex, mtkStrong)
       else:
         return newTokenTuple(lex, mtkEmphasis)

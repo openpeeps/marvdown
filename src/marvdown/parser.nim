@@ -108,6 +108,7 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode])
 proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode]
 
 proc parseEmphasis(md: var Markdown): MarkdownNode
+proc parseStrikethrough(md: var Markdown): MarkdownNode
 proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode)
 
 proc advance*(md: var Markdown, offset = 1) =
@@ -168,27 +169,11 @@ proc parseStrong(md: var Markdown): MarkdownNode =
     case md.parser.curr.kind
     of mtkText:
       strongChildren.add(md.parseText())
+      md.advance()
     of mtkEmphasis:
       let emphNode = md.parseEmphasis()
       strongChildren.add(emphNode)
-      # # Recursively parse emphasis inside strong
-      # var emphNode = MarkdownNode(
-      #   kind: mdkEmphasis,
-      #   children: MarkdownNodeList(),
-      #   line: md.parser.curr.line
-      # )
-      # md.advance()
-      # var emphChildren = newSeq[MarkdownNode]()
-      # while md.parser.curr.kind notin {mtkEmphasis, mtkStrong, mtkEOF}:
-      #   if md.parser.curr.kind == mtkText:
-      #     emphChildren.add(md.parseText())
-      #   else:
-      #     break
-      #   md.advance()
-      # emphNode.children = MarkdownNodeList(items: emphChildren)
-      # strongChildren.add(emphNode)
     else: break
-    md.advance()
 
   if md.parser.curr.kind == mtkStrong and md.parser.curr.line == tk.line:
     result = MarkdownNode(
@@ -232,22 +217,66 @@ proc parseEmphasis(md: var Markdown): MarkdownNode =
   # Parse emphasis text and add to current paragraph
   let tk = md.parser.curr
   md.advance() # Skip opening emphasis
-  var str: string
-  while md.parser.curr.kind != mtkEmphasis and md.parser.curr.line == tk.line:
-    if md.parser.curr.kind == mtkEOF: break
-    str.add(md.parser.curr.token)
-    md.advance()
+  var emphChildren = newSeq[MarkdownNode]()
+  while md.parser.curr.kind notin {mtkEmphasis, mtkEOF} and md.parser.curr.line == tk.line:
+    let ck = md.parser.curr.kind
+    case ck
+    of mtkText:
+      emphChildren.add(md.parseText())
+      md.advance()
+    of mtkStrong:
+      emphChildren.add(md.parseStrong())
+    of mtkStrikethrough:
+      emphChildren.add(md.parseStrikethrough())
+    of mtkLink:
+      emphChildren.add(md.parseLink())
+      md.advance()
+    of mtkImage:
+      emphChildren.add(md.parseImage())
+      md.advance()
+    of mtkInlineCode:
+      emphChildren.add(MarkdownNode(
+        kind: mdkInlineCode,
+        inlineCode: md.parser.curr.token,
+        line: md.parser.curr.line
+      ))
+      md.advance()
+    of mtkLineBreak:
+      emphChildren.add(newRawHtml("<br>", md.parser.curr.line))
+      md.advance()
+    of mtkRefLink:
+      let attrs = md.parser.curr.attrs.get()
+      let displayText = attrs[0]
+      let isExplicit = attrs.len > 1 and attrs[1].len > 0 and attrs[1] != displayText
+      let refLabel = if isExplicit: attrs[1].toLowerAscii
+                     else: displayText.toLowerAscii
+      if md.linkDefs.hasKey(refLabel):
+        let def = md.linkDefs[refLabel]
+        let linkNode = newLink(def.url, def.title, md.parser.curr.line)
+        for n in md.parseInline(displayText):
+          linkNode.children.items.add(n)
+        emphChildren.add(linkNode)
+      else:
+        if isExplicit:
+          emphChildren.add(newText("[" & displayText & "][" & attrs[1] & "]", md.parser.curr.line))
+        else:
+          emphChildren.add(newText("[" & displayText & "]", md.parser.curr.line))
+      md.advance()
+    else: break
   if md.parser.curr.kind == mtkEmphasis and md.parser.curr.line == tk.line:
     result = MarkdownNode(
       kind: mdkEmphasis,
-      children: MarkdownNodeList(items: md.parseInline(str)),
+      children: MarkdownNodeList(items: emphChildren),
       line: tk.line
     )
     md.advance() # Skip closing emphasis
   else:
     # Unclosed emphasis, treat as text
     result = MarkdownNode(kind: mdkText, line: tk.line)
-    result.text = "*" & str
+    result.text = "*"
+    for child in emphChildren:
+      if child.kind == mdkText:
+        result.text.add(child.text)
 
 proc parseStrikethrough(md: var Markdown): MarkdownNode =
   let tk = md.parser.curr
@@ -257,12 +286,12 @@ proc parseStrikethrough(md: var Markdown): MarkdownNode =
     case md.parser.curr.kind
     of mtkText:
       children.add(md.parseText())
+      md.advance()
     of mtkEmphasis:
       children.add(md.parseEmphasis())
     of mtkStrong:
       children.add(md.parseStrong())
     else: break
-    md.advance()
   if md.parser.curr.kind == mtkStrikethrough and md.parser.curr.line == tk.line:
     result = MarkdownNode(
       kind: mdkStrikethrough,
@@ -874,8 +903,8 @@ proc parseFootnoteDef(md: var Markdown): MarkdownNode =
     line: md.parser.curr.line
   )
   # Parse inline content of the footnote definition
-  # for n in md.parseInline(content):
-  #   result.children.items.add(n)
+  for n in md.parseInline(content):
+    result.children.items.add(n)
   
   # Store the footnote definition in the Markdown instance
   if md.footnotes.isNil:

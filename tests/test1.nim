@@ -28,7 +28,23 @@ let withEmailAutolinks = MarkdownOptions(
   enableEmailAutolinks: true
 )
 
-let fixturesDir = absolutePath("tests/fixtures")
+proc writeTestFixtures(): string =
+  let dir = getTempDir() / "marvdown_tests"
+  removeDir(dir)
+  createDir(dir / "nested")
+  writeFile(dir / "simple.md", "world")
+  writeFile(dir / "card.html", "<div class=\"card\"><h2>$title</h2><p>$desc</p></div>")
+  writeFile(dir / "greeting.html", "<div @title=\"Hello\" @desc=\"Welcome to the test\"><h1>$title</h1><p>$desc</p></div>")
+  writeFile(dir / "attrs.html", "<div @data-value=\"123\" @enabled>body</div>")
+  writeFile(dir / "fallback.html", "<p>$unknown</p>")
+  writeFile(dir / "dollar.html", r"<p>\$literal</p>")
+  writeFile(dir / "nested" / "inner.md", "inner @include(\"../simple.md\")")
+  writeFile(dir / "circular_a.md", "@include(\"circular_b.md\")")
+  writeFile(dir / "circular_b.md", "@include(\"circular_a.md\")")
+  writeFile(dir / "code.md", "```\n@include(\"simple.md\")\n```")
+  dir
+
+let fixturesDir = writeTestFixtures()
 
 let componentOpts = MarkdownOptions(
   allowed: opts.allowed,
@@ -672,3 +688,464 @@ suite "customTransform":
     let sample = "See @foo here"
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<p>See @foo here</p>"
+
+suite "elements_text":
+  test "plain paragraph":
+    let sample = "Hello world"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>Hello world</p>"
+
+  test "two paragraphs separated by blank line":
+    let sample = "First para.\n\nSecond para."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>First para.</p><p>Second para.</p>"
+
+  test "soft line break becomes space":
+    let sample = "line one\nline two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>line one line two</p>"
+
+  test "backslash hard break":
+    let sample = "line one\\\nline two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>line one<br>line two</p>"
+
+  test "two-space hard break":
+    let sample = "line one  \nline two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>line one<br>line two</p>"
+
+  test "special characters preserved":
+    let sample = "Hash # and dollar $ and percent %"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>Hash # and dollar $ and percent %</p>"
+
+  test "backslash escapes produce literal characters":
+    let sample = r"Escaped \*asterisk\*, \$dollar and \[bracket\]"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>Escaped *asterisk*, $dollar and [bracket]</p>"
+
+  test "html entities are decoded":
+    let sample = "AT&amp;T uses &lt;b&gt;bold&lt;/b&gt;"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>AT&T uses <b>bold</b></p>"
+
+suite "elements_headings":
+  test "ATX headings without anchors":
+    let sample = "# One\n## Two\n### Three\n#### Four\n##### Five\n###### Six"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<h1>One</h1><h2>Two</h2><h3>Three</h3>" &
+      "<h4>Four</h4><h5>Five</h5><h6>Six</h6>"
+
+  test "ATX headings with anchors":
+    let sample = "# Hello World\n## Foo Bar"
+    var md = newMarkdown(sample, opts)
+    assert md.toHtml() ==
+      "<h1 id=\"hello-world\"><a href=\"#hello-world\" class=\"anchor-link\">🔗</a>Hello World</h1>" &
+      "<h2 id=\"foo-bar\"><a href=\"#foo-bar\" class=\"anchor-link\">🔗</a>Foo Bar</h2>"
+
+  test "heading with inline formatting":
+    let sample = "# Heading with **bold** and `code`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h1>Heading with <strong>bold</strong> and <code>code</code></h1>"
+
+  test "heading with link":
+    let sample = "# Go to [here](https://x.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h1>Go to <a href=\"https://x.com\">here</a></h1>"
+
+  test "heading with html entity":
+    let sample = "# AT&amp;T"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h1>AT&T</h1>"
+
+  test "setext heading level 1":
+    let sample = "Heading\n==="
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h1>Heading</h1>"
+
+  test "setext heading level 2":
+    let sample = "Heading\n---"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h2>Heading</h2>"
+
+  test "six hash signs are not a heading":
+    let sample = "####### not a heading"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>####### not a heading</p>"
+
+suite "elements_inline_formatting":
+  test "italic with single star":
+    let sample = "This is *italic* text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <em>italic</em> text.</p>"
+
+  test "italic with single underscore":
+    let sample = "This is _italic_ text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <em>italic</em> text.</p>"
+
+  test "bold with double star":
+    let sample = "This is **bold** text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <strong>bold</strong> text.</p>"
+
+  test "bold with double underscore":
+    let sample = "This is __bold__ text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <strong>bold</strong> text.</p>"
+
+  test "strikethrough":
+    let sample = "This is ~~strikethrough~~ text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <del>strikethrough</del> text.</p>"
+
+  test "strong nested inside emphasis":
+    let sample = "*italic **bold** italic*"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><em>italic <strong>bold</strong> italic</em></p>"
+
+  test "emphasis nested inside strong":
+    let sample = "**bold *italic* bold**"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><strong>bold <em>italic</em> bold</strong></p>"
+
+  test "combined inline elements":
+    let sample = "**bold** and *italic* and ~~strike~~ and `code`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<p><strong>bold</strong> and <em>italic</em> and <del>strike</del> and <code>code</code></p>"
+
+  test "intraword emphasis":
+    let sample = "un*frigging*believable"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>un<em>frigging</em>believable</p>"
+
+  test "unclosed emphasis is literal":
+    let sample = "*unclosed"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>*unclosed</p>"
+
+  test "inline code":
+    let sample = "Use `code` inline."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>Use <code>code</code> inline.</p>"
+
+  test "inline code escapes html":
+    let sample = "`<>&\"`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><code>&lt;&gt;&amp;&quot;</code></p>"
+
+  test "multi-backtick code span":
+    let sample = "``a ` b``"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><code>a ` b</code></p>"
+
+suite "elements_links":
+  test "inline link":
+    let sample = "[text](https://example.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><a href=\"https://example.com\">text</a></p>"
+
+  test "inline link with title":
+    let sample = "[text](https://example.com \"Title\")"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><a href=\"https://example.com\" title=\"Title\">text</a></p>"
+
+  test "two links in one paragraph":
+    let sample = "[a](https://one.com) and [b](https://two.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><a href=\"https://one.com\">a</a> and <a href=\"https://two.com\">b</a></p>"
+
+  test "link in heading":
+    let sample = "# Go to [here](https://x.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<h1>Go to <a href=\"https://x.com\">here</a></h1>"
+
+  test "bare url is auto-linked":
+    let sample = "Check out https://www.example.com for more."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<p>Check out <a href=\"https://www.example.com\">https://www.example.com</a> for more.</p>"
+
+  test "email autolink when enabled":
+    let sample = "<user@example.com>"
+    var md = newMarkdown(sample, withEmailAutolinks)
+    assert md.toHtml() == "<p><a href=\"mailto:user@example.com\">user@example.com</a></p>"
+
+  test "email not autolinked when disabled":
+    let sample = "<user@example.com>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><user@example.com></p>"
+
+  test "link in table cell":
+    let sample = "| A |\n| - |\n| [x](https://u.com) |"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<table><thead><tr><th>A</th></tr></thead><tbody><tr><td><a href=\"https://u.com\">x</a></td></tr></tbody></table>"
+
+suite "elements_images":
+  test "image with alt and title":
+    let sample = "![alt](https://example.com/img.png \"Title\")"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<img src=\"https://example.com/img.png\" alt=\"alt\" title=\"Title\" />"
+
+  test "image without title":
+    let sample = "![alt](https://example.com/img.png)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<img src=\"https://example.com/img.png\" alt=\"alt\" title=\"\" />"
+
+  test "image without alt":
+    let sample = "![](https://example.com/img.png)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<img src=\"https://example.com/img.png\" alt=\"\" title=\"\" />"
+
+suite "elements_code":
+  test "fenced code block":
+    let sample = "```\ncode\n```"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"\">code</code></pre>"
+
+  test "fenced code block with language":
+    let sample = "```nim\necho \"hi\"\n```"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"language-nim\">echo &quot;hi&quot;</code></pre>"
+
+  test "fenced code block escapes html":
+    let sample = "```\n<div>&\"\n```"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"\">&lt;div&gt;&amp;&quot;</code></pre>"
+
+  test "fenced code block with longer closing fence":
+    let sample = "```\ncode\n````"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"\">code</code></pre>"
+
+  test "indented code block":
+    let sample = "    code\n    here"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"\">code\nhere</code></pre>"
+
+  test "tilde fenced code block":
+    let sample = "~~~\ncode\n~~~"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<pre><code class=\"\">code</code></pre>"
+
+suite "elements_lists":
+  test "unordered list with dash":
+    let sample = "- one\n- two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one</li><li>two</li></ul>"
+
+  test "unordered list with star":
+    let sample = "* one\n* two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one</li><li>two</li></ul>"
+
+  test "unordered list with plus":
+    let sample = "+ one\n+ two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one</li><li>two</li></ul>"
+
+  test "ordered list":
+    let sample = "1. one\n2. two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol><li>one</li><li>two</li></ol>"
+
+  test "ordered list with custom start":
+    let sample = "3. one\n4. two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol start=\"3\"><li>one</li><li>two</li></ol>"
+
+  test "nested unordered list":
+    let sample = "- one\n  - nested\n- two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one<ul><li>nested</li></ul></li><li>two</li></ul>"
+
+  test "ordered list nested in ordered list":
+    let sample = "1. one\n2. two\n   1. nested"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol><li>one</li><li>two<ol><li>nested</li></ol></li></ol>"
+
+  test "list with inline formatting":
+    let sample = "- **bold** and *italic*"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li><strong>bold</strong> and <em>italic</em></li></ul>"
+
+  test "list with inline code":
+    let sample = "- use `code`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>use <code>code</code></li></ul>"
+
+  test "list with link":
+    let sample = "- [link](https://example.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li><a href=\"https://example.com\">link</a></li></ul>"
+
+  test "checkbox list":
+    let sample = "- [x] done\n- [ ] todo"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><input type=\"checkbox\" checked disabled>done</li>" &
+      "<li><input type=\"checkbox\" disabled>todo</li></ul>"
+
+suite "elements_blockquote":
+  test "single line blockquote":
+    let sample = "> A wise quote."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote>A wise quote.</blockquote>"
+
+  test "blockquote with inline formatting":
+    let sample = "> **bold** and `code`"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote><strong>bold</strong> and <code>code</code></blockquote>"
+
+  test "blockquote with link":
+    let sample = "> see [here](https://example.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote>see <a href=\"https://example.com\">here</a></blockquote>"
+
+  test "plain blockquote is not an alert":
+    let sample = "> [!FOO]\n> Not an alert."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<blockquote>[!FOO]Not an alert.</blockquote>"
+
+suite "elements_tables":
+  test "basic table":
+    let sample = "| A | B |\n| - | - |\n| 1 | 2 |"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<table><thead><tr><th>A</th><th>B</th></tr></thead>" &
+      "<tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+
+  test "table with footer":
+    let sample = "| A | B |\n| - | - |\n| 1 | 2 |\n|--- |--- |\n| 3 | 4 |"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<table><thead><tr><th>A</th><th>B</th></tr></thead>" &
+      "<tbody><tr><td>1</td><td>2</td></tr></tbody>" &
+      "<tfoot><tr><td>3</td><td>4</td></tr></tfoot></table>"
+
+  test "table with inline formatting in cells":
+    let sample = "| A | B |\n| - | - |\n| **x** | `y` |"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<table><thead><tr><th>A</th><th>B</th></tr></thead>" &
+      "<tbody><tr><td><strong>x</strong></td><td><code>y</code></td></tr></tbody></table>"
+
+  test "table with empty cell":
+    let sample = "| A | B |\n| - | - |\n|  | 2 |"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<table><thead><tr><th>A</th><th>B</th></tr></thead>" &
+      "<tbody><tr><td></td><td>2</td></tr></tbody></table>"
+
+suite "elements_html":
+  test "block-level html div":
+    let sample = "<div>content</div>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<div>content</div>"
+
+  test "inline html span in paragraph":
+    let sample = "<span>inline</span>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><span>inline</span></p>"
+
+  test "self-closing br":
+    let sample = "<br/>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><br/></p>"
+
+  test "self-closing br with space":
+    let sample = "<br />"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><br /></p>"
+
+  test "self-closing hr":
+    let sample = "<hr/>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr/>"
+
+  test "nested html":
+    let sample = "<div><p>para</p></div>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<div><p>para</p></div>"
+
+  test "html with attributes":
+    let sample = "<div width=\"100\">content</div>"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<div width=\"100\">content</div>"
+
+suite "elements_horizontal_rule":
+  test "three dashes":
+    let sample = "---"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr>"
+
+  test "three stars":
+    let sample = "***"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr>"
+
+  test "three underscores":
+    let sample = "___"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<hr>"
+
+  test "hr between paragraphs":
+    let sample = "a\n\n---\n\nb"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>a</p><hr><p>b</p>"
+
+suite "elements_footnotes":
+  test "basic footnote":
+    let sample = "Text[^1]\n\n[^1]: A footnote."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<p>Text<sup class=\"footnote-ref\"><a href=\"#fn-1\">1</a></sup></p>" &
+      "<hr><div class=\"footnotes\">" &
+      "<div class=\"footnote\" id=\"fn-1\"><sup>1</sup> A footnote.</div></div>"
+
+  test "multiple footnotes":
+    let sample = "One[^a] and two[^b]\n\n[^a]: First\n[^b]: Second"
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html.contains("id=\"fn-a\"")
+    assert html.contains("id=\"fn-b\"")
+    assert html.contains("First")
+    assert html.contains("Second")
+    assert md.hasFootnotes()
+
+  test "footnote after inline element":
+    let sample = "Text **bold**[^2]\n\n[^2]: Another."
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html.contains("<strong>bold</strong>")
+    assert html.contains("<div class=\"footnote\" id=\"fn-2\"><sup>2</sup> Another.</div>")
+
+suite "elements_document":
+  test "empty document":
+    var md = newMarkdown("", noAnchors)
+    assert md.toHtml() == ""
+
+  test "getTitle returns first heading":
+    let sample = "# Introduction\n\nSome text."
+    var md = newMarkdown(sample, opts)
+    discard md.toHtml()
+    assert md.getTitle() == "Introduction"
+
+  test "getTitle defaults when no headings":
+    let sample = "Just a paragraph."
+    var md = newMarkdown(sample, opts)
+    discard md.toHtml()
+    assert md.getTitle() == "Untitled document"
+
+  test "mixed document produces all elements":
+    let sample = "# Title\n\nPara with **bold** and [link](https://x.com).\n\n- one\n- two\n\n```\ncode\n```"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<h1>Title</h1>" &
+      "<p>Para with <strong>bold</strong> and <a href=\"https://x.com\">link</a>.</p>" &
+      "<ul><li>one</li><li>two</li></ul>" &
+      "<pre><code class=\"\">code</code></pre>"
