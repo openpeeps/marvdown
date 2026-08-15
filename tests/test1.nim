@@ -817,6 +817,22 @@ suite "elements_inline_formatting":
     assert md.toHtml() ==
       "<p><strong>bold</strong> and <em>italic</em> and <del>strike</del> and <code>code</code></p>"
 
+  test "link inside strong in paragraph":
+    let sample = "**[powpow](https://github.com/openpeeps/powpow)**: HTTP/1.1."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<p><strong><a href=\"https://github.com/openpeeps/powpow\">powpow</a></strong>: HTTP/1.1.</p>"
+
+  test "link inside emphasis in paragraph":
+    let sample = "*see [here](https://x.com) now*"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><em>see <a href=\"https://x.com\">here</a> now</em></p>"
+
+  test "code inside strong in paragraph":
+    let sample = "**use `code`**"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p><strong>use <code>code</code></strong></p>"
+
   test "intraword emphasis":
     let sample = "un*frigging*believable"
     var md = newMarkdown(sample, noAnchors)
@@ -989,6 +1005,23 @@ suite "elements_lists":
     assert md.toHtml() ==
       "<ul><li><input type=\"checkbox\" checked disabled>done</li>" &
       "<li><input type=\"checkbox\" disabled>todo</li></ul>"
+
+  test "link inside strong in list item":
+    let sample = "- **[powpow](https://github.com/openpeeps/powpow)**: HTTP/1.1 and WebSocket server."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><strong><a href=\"https://github.com/openpeeps/powpow\">powpow</a></strong>: HTTP/1.1 and WebSocket server.</li></ul>"
+
+  test "link inside emphasis in list item":
+    let sample = "- *see [here](https://x.com) now*"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li><em>see <a href=\"https://x.com\">here</a> now</em></li></ul>"
+
+  test "strikethrough with nested elements in list item":
+    let sample = "- ~~`code` and **bold**~~"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><del><code>code</code> and <strong>bold</strong></del></li></ul>"
 
 suite "elements_blockquote":
   test "single line blockquote":

@@ -108,6 +108,7 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode])
 proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode]
 
 proc parseEmphasis(md: var Markdown): MarkdownNode
+proc parseStrong(md: var Markdown): MarkdownNode
 proc parseStrikethrough(md: var Markdown): MarkdownNode
 proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode)
 
@@ -160,21 +161,76 @@ proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
   newText(md.parser.curr.token, md.parser.curr.line)
 
+proc appendInlineFromStream(md: var Markdown, items: var seq[MarkdownNode]): bool =
+  ## Parse a single inline node from the parser token stream and append it
+  ## to `items`. Returns `false` when the current token is not an inline
+  ## kind (the token is left unconsumed so the caller can break out of its
+  ## loop). Handles every inline kind, mirroring the token-stream `parseInline`.
+  let curr = md.parser.curr
+  case curr.kind
+  of mtkText:
+    items.add(md.parseText())
+    md.advance()
+    return true
+  of mtkEmphasis:
+    items.add(md.parseEmphasis())
+    return true
+  of mtkStrong:
+    items.add(md.parseStrong())
+    return true
+  of mtkStrikethrough:
+    items.add(md.parseStrikethrough())
+    return true
+  of mtkLink:
+    items.add(md.parseLink())
+    md.advance()
+    return true
+  of mtkImage:
+    items.add(md.parseImage())
+    md.advance()
+    return true
+  of mtkInlineCode:
+    items.add(MarkdownNode(
+      kind: mdkInlineCode,
+      inlineCode: curr.token,
+      line: curr.line
+    ))
+    md.advance()
+    return true
+  of mtkLineBreak:
+    items.add(newRawHtml("<br>", curr.line))
+    md.advance()
+    return true
+  of mtkRefLink:
+    let attrs = curr.attrs.get()
+    let displayText = attrs[0]
+    let isExplicit = attrs.len > 1 and attrs[1].len > 0 and attrs[1] != displayText
+    let refLabel = if isExplicit: attrs[1].toLowerAscii
+                   else: displayText.toLowerAscii
+    if md.linkDefs.hasKey(refLabel):
+      let def = md.linkDefs[refLabel]
+      let linkNode = newLink(def.url, def.title, curr.line)
+      for n in md.parseInline(displayText):
+        linkNode.children.items.add(n)
+      items.add(linkNode)
+    else:
+      if isExplicit:
+        items.add(newText("[" & displayText & "][" & attrs[1] & "]", curr.line))
+      else:
+        items.add(newText("[" & displayText & "]", curr.line))
+    md.advance()
+    return true
+  else:
+    return false
+
 proc parseStrong(md: var Markdown): MarkdownNode =
   # Parse strong text and add to current paragraph
   let tk = md.parser.curr
   md.advance() # Skip opening strong
   var strongChildren = newSeq[MarkdownNode]()
   while md.parser.curr.kind notin {mtkStrong, mtkEOF}:
-    case md.parser.curr.kind
-    of mtkText:
-      strongChildren.add(md.parseText())
-      md.advance()
-    of mtkEmphasis:
-      let emphNode = md.parseEmphasis()
-      strongChildren.add(emphNode)
-    else: break
-
+    if not appendInlineFromStream(md, strongChildren):
+      break
   if md.parser.curr.kind == mtkStrong and md.parser.curr.line == tk.line:
     result = MarkdownNode(
       kind: mdkStrong,
@@ -219,50 +275,8 @@ proc parseEmphasis(md: var Markdown): MarkdownNode =
   md.advance() # Skip opening emphasis
   var emphChildren = newSeq[MarkdownNode]()
   while md.parser.curr.kind notin {mtkEmphasis, mtkEOF} and md.parser.curr.line == tk.line:
-    let ck = md.parser.curr.kind
-    case ck
-    of mtkText:
-      emphChildren.add(md.parseText())
-      md.advance()
-    of mtkStrong:
-      emphChildren.add(md.parseStrong())
-    of mtkStrikethrough:
-      emphChildren.add(md.parseStrikethrough())
-    of mtkLink:
-      emphChildren.add(md.parseLink())
-      md.advance()
-    of mtkImage:
-      emphChildren.add(md.parseImage())
-      md.advance()
-    of mtkInlineCode:
-      emphChildren.add(MarkdownNode(
-        kind: mdkInlineCode,
-        inlineCode: md.parser.curr.token,
-        line: md.parser.curr.line
-      ))
-      md.advance()
-    of mtkLineBreak:
-      emphChildren.add(newRawHtml("<br>", md.parser.curr.line))
-      md.advance()
-    of mtkRefLink:
-      let attrs = md.parser.curr.attrs.get()
-      let displayText = attrs[0]
-      let isExplicit = attrs.len > 1 and attrs[1].len > 0 and attrs[1] != displayText
-      let refLabel = if isExplicit: attrs[1].toLowerAscii
-                     else: displayText.toLowerAscii
-      if md.linkDefs.hasKey(refLabel):
-        let def = md.linkDefs[refLabel]
-        let linkNode = newLink(def.url, def.title, md.parser.curr.line)
-        for n in md.parseInline(displayText):
-          linkNode.children.items.add(n)
-        emphChildren.add(linkNode)
-      else:
-        if isExplicit:
-          emphChildren.add(newText("[" & displayText & "][" & attrs[1] & "]", md.parser.curr.line))
-        else:
-          emphChildren.add(newText("[" & displayText & "]", md.parser.curr.line))
-      md.advance()
-    else: break
+    if not appendInlineFromStream(md, emphChildren):
+      break
   if md.parser.curr.kind == mtkEmphasis and md.parser.curr.line == tk.line:
     result = MarkdownNode(
       kind: mdkEmphasis,
@@ -283,15 +297,8 @@ proc parseStrikethrough(md: var Markdown): MarkdownNode =
   md.advance()
   var children = newSeq[MarkdownNode]()
   while md.parser.curr.kind notin {mtkStrikethrough, mtkEOF}:
-    case md.parser.curr.kind
-    of mtkText:
-      children.add(md.parseText())
-      md.advance()
-    of mtkEmphasis:
-      children.add(md.parseEmphasis())
-    of mtkStrong:
-      children.add(md.parseStrong())
-    else: break
+    if not appendInlineFromStream(md, children):
+      break
   if md.parser.curr.kind == mtkStrikethrough and md.parser.curr.line == tk.line:
     result = MarkdownNode(
       kind: mdkStrikethrough,
@@ -384,213 +391,129 @@ proc parseInline(md: var Markdown, items: var seq[MarkdownNode]) =
     else: break
     if node != nil: items.add(node)
 
+proc parseInlineNode(md: var Markdown, lex: var MarkdownLexer, curr: var MarkdownTokenTuple): MarkdownNode =
+  ## Parse a single inline token (and any nested inline content) into a
+  ## MarkdownNode, consuming tokens from `lex` as needed. Used by the
+  ## string-based inline parser for list items, headings, table cells, etc.
+  case curr.kind
+  of mtkText:
+    result = MarkdownNode(kind: mdkText, text: curr.token, line: curr.line)
+    curr = lex.nextToken()
+  of mtkEmphasis:
+    let emphLine = curr.line
+    curr = lex.nextToken()
+    var emphChildren: seq[MarkdownNode] = @[]
+    while curr.kind != mtkEmphasis and curr.kind != mtkEOF:
+      let child = parseInlineNode(md, lex, curr)
+      if not child.isNil:
+        emphChildren.add(child)
+    result = MarkdownNode(
+      kind: mdkEmphasis,
+      children: MarkdownNodeList(items: emphChildren),
+      line: emphLine
+    )
+    if curr.kind == mtkEmphasis:
+      curr = lex.nextToken()
+  of mtkStrong:
+    let strongLine = curr.line
+    curr = lex.nextToken()
+    var strongChildren: seq[MarkdownNode] = @[]
+    while curr.kind != mtkStrong and curr.kind != mtkEOF:
+      let child = parseInlineNode(md, lex, curr)
+      if not child.isNil:
+        strongChildren.add(child)
+    result = MarkdownNode(
+      kind: mdkStrong,
+      children: MarkdownNodeList(items: strongChildren),
+      line: strongLine
+    )
+    if curr.kind == mtkStrong:
+      curr = lex.nextToken()
+  of mtkStrikethrough:
+    let stLine = curr.line
+    curr = lex.nextToken()
+    var stChildren: seq[MarkdownNode] = @[]
+    while curr.kind != mtkStrikethrough and curr.kind != mtkEOF:
+      let child = parseInlineNode(md, lex, curr)
+      if not child.isNil:
+        stChildren.add(child)
+    result = MarkdownNode(
+      kind: mdkStrikethrough,
+      children: MarkdownNodeList(items: stChildren),
+      line: stLine
+    )
+    if curr.kind == mtkStrikethrough:
+      curr = lex.nextToken()
+  of mtkLink:
+    if curr.attrs.isSome and curr.attrs.get().len >= 2:
+      let textVal = curr.attrs.get()[0]
+      let hrefVal = curr.attrs.get()[1]
+      let titleVal =
+        if curr.attrs.get().len > 2: curr.attrs.get()[2]
+        else: "" # no title provided
+      let linkNode = newLink(hrefVal, titleVal, curr.line)
+      if textVal == hrefVal:
+        # Autolink (or `[url](url)`): the display text is the URL itself.
+        # Re-parsing it would recursively detect the same autolink, so use
+        # the plain text directly.
+        linkNode.children.items.add(newText(textVal, curr.line))
+      else:
+        for n in md.parseInline(textVal):
+          linkNode.children.items.add(n)
+      result = linkNode
+    curr = lex.nextToken()
+  of mtkImage:
+    if curr.attrs.isSome and curr.attrs.get().len >= 2:
+      let alt = curr.attrs.get()[0]
+      let src = curr.attrs.get()[1]
+      let title =
+        if curr.attrs.get().len > 2: curr.attrs.get()[2]
+        else: ""
+      result = newImage(alt, src, title, curr.line)
+    curr = lex.nextToken()
+  of mtkInlineCode:
+    result = MarkdownNode(
+      kind: mdkInlineCode,
+      inlineCode: curr.token,
+      line: curr.line
+    )
+    curr = lex.nextToken()
+  of mtkLineBreak:
+    result = newRawHtml("<br>", curr.line)
+    curr = lex.nextToken()
+  of mtkRefLink:
+    if curr.attrs.isSome and curr.attrs.get().len >= 2:
+      let displayText = curr.attrs.get()[0]
+      let isExplicit = curr.attrs.get().len > 1 and
+                       curr.attrs.get()[1].len > 0 and
+                       curr.attrs.get()[1] != displayText
+      let refLabel =
+        if isExplicit: curr.attrs.get()[1].toLowerAscii
+        else: displayText.toLowerAscii
+      if md.linkDefs.hasKey(refLabel):
+        let def = md.linkDefs[refLabel]
+        let linkNode = newLink(def.url, def.title, curr.line)
+        for n in md.parseInline(displayText):
+          linkNode.children.items.add(n)
+        result = linkNode
+      else:
+        if isExplicit:
+          result = newText("[" & displayText & "][" & curr.attrs.get()[1] & "]", curr.line)
+        else:
+          result = newText("[" & displayText & "]", curr.line)
+    curr = lex.nextToken()
+  else:
+    result = MarkdownNode(kind: mdkText, text: curr.token, line: curr.line)
+    curr = lex.nextToken()
+
 proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
   var lex = initLexer(text)
   var curr = lex.nextToken()
   let ln = curr.line
   while curr.kind != mtkEOF and curr.line == ln:
-    var node: MarkdownNode
-    case curr.kind
-    of mtkText:
-      node = MarkdownNode(
-        kind: mdkText,
-        text: curr.token,
-        line: curr.line
-      )
-      curr = lex.nextToken()
-    of mtkEmphasis:
-      let emphLine = curr.line
-      curr = lex.nextToken()
-      var emphChildren: seq[MarkdownNode] = @[]
-      while curr.kind != mtkEmphasis and curr.kind != mtkEOF:
-        if curr.kind == mtkText:
-          emphChildren.add(MarkdownNode(
-            kind: mdkText,
-            text: curr.token,
-            line: curr.line
-          ))
-        curr = lex.nextToken()
-      node = MarkdownNode(
-        kind: mdkEmphasis,
-        children: MarkdownNodeList(items: emphChildren),
-        line: emphLine
-      )
-      if curr.kind == mtkEmphasis:
-        curr = lex.nextToken()
-    of mtkStrikethrough:
-      let stLine = curr.line
-      curr = lex.nextToken()
-      var stChildren: seq[MarkdownNode] = @[]
-      while curr.kind != mtkStrikethrough and curr.kind != mtkEOF:
-        case curr.kind
-        of mtkText:
-          stChildren.add(MarkdownNode(
-            kind: mdkText,
-            text: curr.token,
-            line: curr.line
-          ))
-        of mtkEmphasis:
-          var emphChildren: seq[MarkdownNode] = @[]
-          let emphLine = curr.line
-          curr = lex.nextToken()
-          while curr.kind != mtkEmphasis and curr.kind != mtkEOF:
-            if curr.kind == mtkText:
-              emphChildren.add(MarkdownNode(
-                kind: mdkText, text: curr.token, line: curr.line
-              ))
-            curr = lex.nextToken()
-          stChildren.add(MarkdownNode(
-            kind: mdkEmphasis,
-            children: MarkdownNodeList(items: emphChildren),
-            line: emphLine
-          ))
-        else:
-          stChildren.add(MarkdownNode(
-            kind: mdkText, text: curr.token, line: curr.line
-          ))
-        curr = lex.nextToken()
-      node = MarkdownNode(
-        kind: mdkStrikethrough,
-        children: MarkdownNodeList(items: stChildren),
-        line: stLine
-      )
-      if curr.kind == mtkStrikethrough:
-        curr = lex.nextToken()
-    of mtkImage:
-      # Parse image inline
-      if curr.attrs.isSome and curr.attrs.get().len >= 2:
-        let alt = curr.attrs.get()[0]
-        let src = curr.attrs.get()[1]
-        let title =
-          if curr.attrs.get().len > 2:
-            curr.attrs.get()[2]
-          else: ""
-        node = newImage(alt, src, title, curr.line)
-      curr = lex.nextToken()
-    of mtkInlineCode:
-      node = MarkdownNode(
-        kind: mdkInlineCode,
-        inlineCode: curr.token,
-        line: curr.line
-      )
-      curr = lex.nextToken()
-    of mtkStrong:
-      var strongChildren: seq[MarkdownNode] = @[]
-      let strongLine = curr.line
-      curr = lex.nextToken()
-      while curr.kind != mtkStrong and curr.kind != mtkEOF:
-        case curr.kind
-        of mtkText:
-          strongChildren.add(MarkdownNode(
-            kind: mdkText,
-            text: curr.token,
-            line: curr.line
-          ))
-        of mtkEmphasis:
-          var emphChildren: seq[MarkdownNode] = @[]
-          let emphLine = curr.line
-          curr = lex.nextToken()
-          while curr.kind != mtkEmphasis and curr.kind != mtkStrong and curr.kind != mtkEOF:
-            if curr.kind == mtkText:
-              emphChildren.add(MarkdownNode(
-                kind: mdkText,
-                text: curr.token,
-                line: curr.line
-              ))
-            curr = lex.nextToken()
-          strongChildren.add(MarkdownNode(
-            kind: mdkEmphasis,
-            children: MarkdownNodeList(items: emphChildren),
-            line: emphLine
-          ))
-        else:
-          strongChildren.add(MarkdownNode(
-            kind: mdkText,
-            text: curr.token,
-            line: curr.line
-          ))
-        curr = lex.nextToken()
-      node = MarkdownNode(
-        kind: mdkStrong,
-        children: MarkdownNodeList(items: strongChildren),
-        line: strongLine
-      )
-      if curr.kind == mtkStrong:
-        curr = lex.nextToken()
-      else: discard # todo handle unclosed strong
-    of mtkLink:
-      # Parse link inline
-      if curr.attrs.isSome and curr.attrs.get().len >= 2:
-        let textVal = curr.attrs.get()[0]
-        let hrefVal = curr.attrs.get()[1]
-        let titleVal =
-          if curr.attrs.get().len > 2:
-            curr.attrs.get()[2]
-          else: "" # no title provided
-
-        let textNode = MarkdownNode(
-          kind: mdkText,
-          text: textVal,
-          line: curr.line
-        )
-        let linkNode = MarkdownNode(
-          kind: mdkLink,
-          linkHref: hrefVal,
-          linkTitle: titleVal,
-          children: MarkdownNodeList(),
-          line: curr.line
-        )
-        if textVal == hrefVal:
-          # Autolink (or `[url](url)`): the display text is the URL itself.
-          # Re-parsing it would recursively detect the same autolink, so use
-          # the plain text directly.
-          linkNode.children.items.add(textNode)
-        else:
-          for n in md.parseInline(textVal):
-            linkNode.children.items.add(n)
-        result.add(linkNode)
-      curr = lex.nextToken()
-    of mtkRefLink:
-      if curr.attrs.isSome and curr.attrs.get().len >= 2:
-        let displayText = curr.attrs.get()[0]
-        let isExplicit = curr.attrs.get().len > 1 and
-                         curr.attrs.get()[1].len > 0 and
-                         curr.attrs.get()[1] != displayText
-        let refLabel =
-          if isExplicit: curr.attrs.get()[1].toLowerAscii
-          else: displayText.toLowerAscii
-        if md.linkDefs.hasKey(refLabel):
-          let def = md.linkDefs[refLabel]
-          let linkNode = MarkdownNode(
-            kind: mdkLink,
-            linkHref: def.url,
-            linkTitle: def.title,
-            children: MarkdownNodeList(),
-            line: curr.line
-          )
-          for n in md.parseInline(displayText):
-            linkNode.children.items.add(n)
-          result.add(linkNode)
-        else:
-          if isExplicit:
-            result.add(MarkdownNode(
-              kind: mdkText,
-              text: "[" & displayText & "][" & curr.attrs.get()[1] & "]",
-              line: curr.line))
-          else:
-            result.add(MarkdownNode(
-              kind: mdkText, text: "[" & displayText & "]", line: curr.line))
-      curr = lex.nextToken()
-    else:
-      node = MarkdownNode(
-        kind: mdkText,
-        text: curr.token,
-        line: curr.line
-      )
-      curr = lex.nextToken()
-    
-    # add the parsed node to result
-    if node != nil: result.add(node)
+    let node = parseInlineNode(md, lex, curr)
+    if not node.isNil:
+      result.add(node)
 
 proc skipWhitespaceTokens(md: var Markdown) =
   ## Skip leading whitespace tokens (spaces between list items)
