@@ -16,23 +16,70 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.4">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.10">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.4"></script>
+<script type="text/javascript" src="dochack.js?v=2.2.10"></script>
 </head>
 <body>
   <div class="document" id="documentId">
+    <input type="checkbox" id="nav-toggle" hidden>
+    <label for="nav-toggle" id="nav-burger">&#9776;</label>
+    <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">marvdown</a>, <a href="marvdown/ast.html">marvdown/ast</a>, <a href="marvdown/lexer.html">marvdown/lexer</a>, <a href="marvdown/parser.html">marvdown/parser</a>, <a href="marvdown/renderer.html">marvdown/renderer</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">marvdown</a>, <a href="marvdown/ast.html">marvdown/ast</a>, <a href="marvdown/components.html">marvdown/components</a>, <a href="marvdown/lexer.html">marvdown/lexer</a>, <a href="marvdown/parser.html">marvdown/parser</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="advance" href="#advance"><span>advance:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc advance(md: var Markdown; offset = 1)" href="marvdown/parser.html#advance%2CMarkdown%2Cint">parser: proc advance(md: var Markdown; offset = 1)</a></li>
           </ul></dd>
-<dt><a name="HeadlineAnchor" href="#HeadlineAnchor"><span>HeadlineAnchor:</span></a></dt><dd><ul class="simple">
+<dt><a name="ComponentScope" href="#ComponentScope"><span>ComponentScope:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="parser: type HeadlineAnchor" href="marvdown/parser.html#HeadlineAnchor">parser: type HeadlineAnchor</a></li>
+          data-doc-search-tag="components: type ComponentScope" href="marvdown/components.html#ComponentScope">components: type ComponentScope</a></li>
+          </ul></dd>
+<dt><a name="debugEcho" href="#debugEcho"><span>debugEcho:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc debugEcho(n: MarkdownNode)" href="marvdown/ast.html#debugEcho%2CMarkdownNode">ast: proc debugEcho(n: MarkdownNode)</a></li>
+          </ul></dd>
+<dt><a name="decodeHtmlEntities" href="#decodeHtmlEntities"><span>decodeHtmlEntities:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc decodeHtmlEntities(s: string): string" href="marvdown/parser.html#decodeHtmlEntities%2Cstring">parser: proc decodeHtmlEntities(s: string): string</a></li>
+          </ul></dd>
+<dt><a name="getAst" href="#getAst"><span>getAst:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="marvdown: proc getAst(content: sink string): string" href="index.html#getAst%2Csinkstring">marvdown: proc getAst(content: sink string): string</a></li>
+          </ul></dd>
+<dt><a name="getFootnotes" href="#getFootnotes"><span>getFootnotes:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]" href="marvdown/parser.html#getFootnotes%2CMarkdown">parser: proc getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]</a></li>
+          </ul></dd>
+<dt><a name="getHeader" href="#getHeader"><span>getHeader:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getHeader(md: Markdown): YAMLObject" href="marvdown/parser.html#getHeader%2CMarkdown">parser: proc getHeader(md: Markdown): YAMLObject</a></li>
+          </ul></dd>
+<dt><a name="getSelectorItems" href="#getSelectorItems"><span>getSelectorItems:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]" href="marvdown/parser.html#getSelectorItems%2CMarkdown">parser: proc getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]</a></li>
+          </ul></dd>
+<dt><a name="getSelectors" href="#getSelectors"><span>getSelectors:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getSelectors(md: Markdown): OrderedTableRef[string, string]" href="marvdown/parser.html#getSelectors%2CMarkdown">parser: proc getSelectors(md: Markdown): OrderedTableRef[string, string]</a></li>
+          </ul></dd>
+<dt><a name="getSelectorsList" href="#getSelectorsList"><span>getSelectorsList:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getSelectorsList(md: Markdown): seq[string]" href="marvdown/parser.html#getSelectorsList%2CMarkdown">parser: proc getSelectorsList(md: Markdown): seq[string]</a></li>
+          </ul></dd>
+<dt><a name="getTitle" href="#getTitle"><span>getTitle:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc getTitle(md: Markdown): string" href="marvdown/parser.html#getTitle%2CMarkdown">parser: proc getTitle(md: Markdown): string</a></li>
+          </ul></dd>
+<dt><a name="hasFootnotes" href="#hasFootnotes"><span>hasFootnotes:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc hasFootnotes(md: Markdown): bool" href="marvdown/parser.html#hasFootnotes%2CMarkdown">parser: proc hasFootnotes(md: Markdown): bool</a></li>
+          </ul></dd>
+<dt><a name="hasSelectors" href="#hasSelectors"><span>hasSelectors:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc hasSelectors(md: Markdown): bool" href="marvdown/parser.html#hasSelectors%2CMarkdown">parser: proc hasSelectors(md: Markdown): bool</a></li>
           </ul></dd>
 <dt><a name="htmlCommand" href="#htmlCommand"><span>htmlCommand:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -40,7 +87,11 @@
           </ul></dd>
 <dt><a name="initLexer" href="#initLexer"><span>initLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="lexer: proc initLexer(input: sink string): MarkdownLexer" href="marvdown/lexer.html#initLexer%2Csinkstring">lexer: proc initLexer(input: sink string): MarkdownLexer</a></li>
+          data-doc-search-tag="lexer: proc initLexer(input: sink string; enableEmailAutolinks: bool = false): MarkdownLexer" href="marvdown/lexer.html#initLexer%2Csinkstring%2Cbool">lexer: proc initLexer(input: sink string; enableEmailAutolinks: bool = false): MarkdownLexer</a></li>
+          </ul></dd>
+<dt><a name="lazyloadMediaSrc" href="#lazyloadMediaSrc"><span>lazyloadMediaSrc:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc lazyloadMediaSrc(html: sink string; tagName: string): string" href="marvdown/parser.html#lazyloadMediaSrc%2Csinkstring%2Cstring">parser: proc lazyloadMediaSrc(html: sink string; tagName: string): string</a></li>
           </ul></dd>
 <dt><a name="Markdown" href="#Markdown"><span>Markdown:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -78,6 +129,10 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: tuple MarkdownTokenTuple" href="marvdown/lexer.html#MarkdownTokenTuple">lexer: tuple MarkdownTokenTuple</a></li>
           </ul></dd>
+<dt><a name="mdkAlert" href="#mdkAlert"><span>mdkAlert:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkAlert" href="marvdown/ast.html#mdkAlert">ast: MarkdownNodeKind.mdkAlert</a></li>
+          </ul></dd>
 <dt><a name="mdkBlockquote" href="#mdkBlockquote"><span>mdkBlockquote:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: MarkdownNodeKind.mdkBlockquote" href="marvdown/ast.html#mdkBlockquote">ast: MarkdownNodeKind.mdkBlockquote</a></li>
@@ -97,6 +152,14 @@
 <dt><a name="mdkEmphasis" href="#mdkEmphasis"><span>mdkEmphasis:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: MarkdownNodeKind.mdkEmphasis" href="marvdown/ast.html#mdkEmphasis">ast: MarkdownNodeKind.mdkEmphasis</a></li>
+          </ul></dd>
+<dt><a name="mdkFootnoteDef" href="#mdkFootnoteDef"><span>mdkFootnoteDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkFootnoteDef" href="marvdown/ast.html#mdkFootnoteDef">ast: MarkdownNodeKind.mdkFootnoteDef</a></li>
+          </ul></dd>
+<dt><a name="mdkFootnoteRef" href="#mdkFootnoteRef"><span>mdkFootnoteRef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkFootnoteRef" href="marvdown/ast.html#mdkFootnoteRef">ast: MarkdownNodeKind.mdkFootnoteRef</a></li>
           </ul></dd>
 <dt><a name="mdkHeading" href="#mdkHeading"><span>mdkHeading:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -138,6 +201,10 @@
 <li><a class="reference external"
           data-doc-search-tag="ast: MarkdownNodeKind.mdkParagraph" href="marvdown/ast.html#mdkParagraph">ast: MarkdownNodeKind.mdkParagraph</a></li>
           </ul></dd>
+<dt><a name="mdkStrikethrough" href="#mdkStrikethrough"><span>mdkStrikethrough:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkStrikethrough" href="marvdown/ast.html#mdkStrikethrough">ast: MarkdownNodeKind.mdkStrikethrough</a></li>
+          </ul></dd>
 <dt><a name="mdkStrong" href="#mdkStrong"><span>mdkStrong:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: MarkdownNodeKind.mdkStrong" href="marvdown/ast.html#mdkStrong">ast: MarkdownNodeKind.mdkStrong</a></li>
@@ -145,6 +212,22 @@
 <dt><a name="mdkTable" href="#mdkTable"><span>mdkTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: MarkdownNodeKind.mdkTable" href="marvdown/ast.html#mdkTable">ast: MarkdownNodeKind.mdkTable</a></li>
+          </ul></dd>
+<dt><a name="mdkTableCell" href="#mdkTableCell"><span>mdkTableCell:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkTableCell" href="marvdown/ast.html#mdkTableCell">ast: MarkdownNodeKind.mdkTableCell</a></li>
+          </ul></dd>
+<dt><a name="mdkTableFooter" href="#mdkTableFooter"><span>mdkTableFooter:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkTableFooter" href="marvdown/ast.html#mdkTableFooter">ast: MarkdownNodeKind.mdkTableFooter</a></li>
+          </ul></dd>
+<dt><a name="mdkTableHeader" href="#mdkTableHeader"><span>mdkTableHeader:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkTableHeader" href="marvdown/ast.html#mdkTableHeader">ast: MarkdownNodeKind.mdkTableHeader</a></li>
+          </ul></dd>
+<dt><a name="mdkTableRow" href="#mdkTableRow"><span>mdkTableRow:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: MarkdownNodeKind.mdkTableRow" href="marvdown/ast.html#mdkTableRow">ast: MarkdownNodeKind.mdkTableRow</a></li>
           </ul></dd>
 <dt><a name="mdkText" href="#mdkText"><span>mdkText:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -178,6 +261,14 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkEOF" href="marvdown/lexer.html#mtkEOF">lexer: MarkdownTokenKind.mtkEOF</a></li>
           </ul></dd>
+<dt><a name="mtkFootnoteDef" href="#mtkFootnoteDef"><span>mtkFootnoteDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkFootnoteDef" href="marvdown/lexer.html#mtkFootnoteDef">lexer: MarkdownTokenKind.mtkFootnoteDef</a></li>
+          </ul></dd>
+<dt><a name="mtkFootnoteRef" href="#mtkFootnoteRef"><span>mtkFootnoteRef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkFootnoteRef" href="marvdown/lexer.html#mtkFootnoteRef">lexer: MarkdownTokenKind.mtkFootnoteRef</a></li>
+          </ul></dd>
 <dt><a name="mtkHeading" href="#mtkHeading"><span>mtkHeading:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkHeading" href="marvdown/lexer.html#mtkHeading">lexer: MarkdownTokenKind.mtkHeading</a></li>
@@ -206,6 +297,10 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkLink" href="marvdown/lexer.html#mtkLink">lexer: MarkdownTokenKind.mtkLink</a></li>
           </ul></dd>
+<dt><a name="mtkLinkDef" href="#mtkLinkDef"><span>mtkLinkDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkLinkDef" href="marvdown/lexer.html#mtkLinkDef">lexer: MarkdownTokenKind.mtkLinkDef</a></li>
+          </ul></dd>
 <dt><a name="mtkList" href="#mtkList"><span>mtkList:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkList" href="marvdown/lexer.html#mtkList">lexer: MarkdownTokenKind.mtkList</a></li>
@@ -214,6 +309,10 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkListItem" href="marvdown/lexer.html#mtkListItem">lexer: MarkdownTokenKind.mtkListItem</a></li>
           </ul></dd>
+<dt><a name="mtkListItemCheckbox" href="#mtkListItemCheckbox"><span>mtkListItemCheckbox:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkListItemCheckbox" href="marvdown/lexer.html#mtkListItemCheckbox">lexer: MarkdownTokenKind.mtkListItemCheckbox</a></li>
+          </ul></dd>
 <dt><a name="mtkOListItem" href="#mtkOListItem"><span>mtkOListItem:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkOListItem" href="marvdown/lexer.html#mtkOListItem">lexer: MarkdownTokenKind.mtkOListItem</a></li>
@@ -221,6 +320,14 @@
 <dt><a name="mtkParagraph" href="#mtkParagraph"><span>mtkParagraph:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkParagraph" href="marvdown/lexer.html#mtkParagraph">lexer: MarkdownTokenKind.mtkParagraph</a></li>
+          </ul></dd>
+<dt><a name="mtkRefLink" href="#mtkRefLink"><span>mtkRefLink:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkRefLink" href="marvdown/lexer.html#mtkRefLink">lexer: MarkdownTokenKind.mtkRefLink</a></li>
+          </ul></dd>
+<dt><a name="mtkStrikethrough" href="#mtkStrikethrough"><span>mtkStrikethrough:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="lexer: MarkdownTokenKind.mtkStrikethrough" href="marvdown/lexer.html#mtkStrikethrough">lexer: MarkdownTokenKind.mtkStrikethrough</a></li>
           </ul></dd>
 <dt><a name="mtkStrong" href="#mtkStrong"><span>mtkStrong:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -238,17 +345,55 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: MarkdownTokenKind.mtkUnknown" href="marvdown/lexer.html#mtkUnknown">lexer: MarkdownTokenKind.mtkUnknown</a></li>
           </ul></dd>
+<dt><a name="newComponentScope" href="#newComponentScope"><span>newComponentScope:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="components: proc newComponentScope(): ComponentScope" href="marvdown/components.html#newComponentScope">components: proc newComponentScope(): ComponentScope</a></li>
+          </ul></dd>
+<dt><a name="newHeading" href="#newHeading"><span>newHeading:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc newHeading(level: range[1 .. 6]; ln: int): MarkdownNode" href="marvdown/ast.html#newHeading%2Crange%5B%5D%2Cint">ast: proc newHeading(level: range[1 .. 6]; ln: int): MarkdownNode</a></li>
+          </ul></dd>
+<dt><a name="newImage" href="#newImage"><span>newImage:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc newImage(alt, src, title: string; ln: int): MarkdownNode" href="marvdown/ast.html#newImage%2Cstring%2Cstring%2Cstring%2Cint">ast: proc newImage(alt, src, title: string; ln: int): MarkdownNode</a></li>
+          </ul></dd>
+<dt><a name="newLink" href="#newLink"><span>newLink:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc newLink(href, title: string; ln: int): MarkdownNode" href="marvdown/ast.html#newLink%2Cstring%2Cstring%2Cint">ast: proc newLink(href, title: string; ln: int): MarkdownNode</a></li>
+          </ul></dd>
 <dt><a name="newMarkdown" href="#newMarkdown"><span>newMarkdown:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown" href="marvdown/parser.html#newMarkdown%2Csinkstring%2CMarkdownOptions">parser: proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown</a></li>
+          </ul></dd>
+<dt><a name="newParagraph" href="#newParagraph"><span>newParagraph:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc newParagraph(curr: MarkdownTokenTuple): MarkdownNode" href="marvdown/parser.html#newParagraph%2CMarkdownTokenTuple">parser: proc newParagraph(curr: MarkdownTokenTuple): MarkdownNode</a></li>
+          </ul></dd>
+<dt><a name="newRawHtml" href="#newRawHtml"><span>newRawHtml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc newRawHtml(html: string; ln: int): MarkdownNode" href="marvdown/ast.html#newRawHtml%2Cstring%2Cint">ast: proc newRawHtml(html: string; ln: int): MarkdownNode</a></li>
+          </ul></dd>
+<dt><a name="newText" href="#newText"><span>newText:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc newText(text: string; ln: int): MarkdownNode" href="marvdown/ast.html#newText%2Cstring%2Cint">ast: proc newText(text: string; ln: int): MarkdownNode</a></li>
           </ul></dd>
 <dt><a name="nextToken" href="#nextToken"><span>nextToken:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple" href="marvdown/lexer.html#nextToken%2CMarkdownLexer">lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple</a></li>
           </ul></dd>
-<dt><a name="renderNode" href="#renderNode"><span>renderNode:</span></a></dt><dd><ul class="simple">
+<dt><a name="preprocess" href="#preprocess"><span>preprocess:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="renderer: proc renderNode(node: MarkdownNode): string" href="marvdown/renderer.html#renderNode%2CMarkdownNode">renderer: proc renderNode(node: MarkdownNode): string</a></li>
+          data-doc-search-tag="components: proc preprocess(content: string; basePath: string; scope: var ComponentScope;
+           visited: var seq[string]): string" href="marvdown/components.html#preprocess%2Cstring%2Cstring%2CComponentScope%2Cseq%5Bstring%5D">components: proc preprocess(content: string; basePath: string; scope: var ComponentScope;
+           visited: var seq[string]): string</a></li>
+          </ul></dd>
+<dt><a name="processHtmlContent" href="#processHtmlContent"><span>processHtmlContent:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="components: proc processHtmlContent(html: sink string; scope: var ComponentScope): string" href="marvdown/components.html#processHtmlContent%2Csinkstring%2CComponentScope">components: proc processHtmlContent(html: sink string; scope: var ComponentScope): string</a></li>
+          </ul></dd>
+<dt><a name="resolveVariables" href="#resolveVariables"><span>resolveVariables:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="components: proc resolveVariables(text: string; scope: ComponentScope): string" href="marvdown/components.html#resolveVariables%2Cstring%2CComponentScope">components: proc resolveVariables(text: string; scope: ComponentScope): string</a></li>
           </ul></dd>
 <dt><a name="tagAll" href="#tagAll"><span>tagAll:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -272,13 +417,29 @@
           </ul></dd>
 <dt><a name="toHtml" href="#toHtml"><span>toHtml:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="parser: proc toHtml(md: Markdown): string" href="marvdown/parser.html#toHtml%2CMarkdown">parser: proc toHtml(md: Markdown): string</a></li>
+          data-doc-search-tag="marvdown: proc toHtml(content: sink string): owned string" href="index.html#toHtml%2Csinkstring">marvdown: proc toHtml(content: sink string): owned string</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="parser: proc toHtml(md: var Markdown): string" href="marvdown/parser.html#toHtml%2CMarkdown">parser: proc toHtml(md: var Markdown): string</a></li>
+          </ul></dd>
+<dt><a name="toJson" href="#toJson"><span>toJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc toJson(md: Markdown): string" href="marvdown/parser.html#toJson%2CMarkdown">parser: proc toJson(md: Markdown): string</a></li>
+          </ul></dd>
+<dt><a name="toXML" href="#toXML"><span>toXML:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="marvdown: proc toXML(md: var Markdown): XmlNode" href="index.html#toXML%2CMarkdown">marvdown: proc toXML(md: var Markdown): XmlNode</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="marvdown: proc toXML(content: sink string): XmlNode" href="index.html#toXML%2Csinkstring">marvdown: proc toXML(content: sink string): XmlNode</a></li>
+          </ul></dd>
+<dt><a name="transformLines" href="#transformLines"><span>transformLines:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="components: proc transformLines(content: string; transform: proc (line: string): string): string" href="marvdown/components.html#transformLines%2Cstring%2Cproc%28string%29">components: proc transformLines(content: string; transform: proc (line: string): string): string</a></li>
           </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-13 05:59:54 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-16 10:45:28 UTC</small>
       </div>
     </div>
   </div>

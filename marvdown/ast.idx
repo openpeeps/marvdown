@@ -1,23 +1,37 @@
 nimTitle	ast	marvdown/ast.html	module marvdown/ast		0
-nim	mdkText	marvdown/ast.html#mdkText	MarkdownNodeKind.mdkText		12
-nim	mdkElement	marvdown/ast.html#mdkElement	MarkdownNodeKind.mdkElement		12
-nim	mdkCodeBlock	marvdown/ast.html#mdkCodeBlock	MarkdownNodeKind.mdkCodeBlock		12
-nim	mdkHeading	marvdown/ast.html#mdkHeading	MarkdownNodeKind.mdkHeading		12
-nim	mdkList	marvdown/ast.html#mdkList	MarkdownNodeKind.mdkList		12
-nim	mdkListItem	marvdown/ast.html#mdkListItem	MarkdownNodeKind.mdkListItem		12
-nim	mdkBlockquote	marvdown/ast.html#mdkBlockquote	MarkdownNodeKind.mdkBlockquote		12
-nim	mdkHorizontalRule	marvdown/ast.html#mdkHorizontalRule	MarkdownNodeKind.mdkHorizontalRule		12
-nim	mdkLink	marvdown/ast.html#mdkLink	MarkdownNodeKind.mdkLink		12
-nim	mdkImage	marvdown/ast.html#mdkImage	MarkdownNodeKind.mdkImage		12
-nim	mdkEmphasis	marvdown/ast.html#mdkEmphasis	MarkdownNodeKind.mdkEmphasis		12
-nim	mdkStrong	marvdown/ast.html#mdkStrong	MarkdownNodeKind.mdkStrong		12
-nim	mdkInlineCode	marvdown/ast.html#mdkInlineCode	MarkdownNodeKind.mdkInlineCode		12
-nim	mdkLineBreak	marvdown/ast.html#mdkLineBreak	MarkdownNodeKind.mdkLineBreak		12
-nim	mdkHtml	marvdown/ast.html#mdkHtml	MarkdownNodeKind.mdkHtml		12
-nim	mdkTable	marvdown/ast.html#mdkTable	MarkdownNodeKind.mdkTable		12
-nim	mdkParagraph	marvdown/ast.html#mdkParagraph	MarkdownNodeKind.mdkParagraph		12
-nim	mdkDocument	marvdown/ast.html#mdkDocument	MarkdownNodeKind.mdkDocument		12
-nim	mdkUnknown	marvdown/ast.html#mdkUnknown	MarkdownNodeKind.mdkUnknown		12
-nim	MarkdownNodeKind	marvdown/ast.html#MarkdownNodeKind	enum MarkdownNodeKind		12
-nim	MarkdownNodeList	marvdown/ast.html#MarkdownNodeList	type MarkdownNodeList		33
-nim	MarkdownNode	marvdown/ast.html#MarkdownNode	type MarkdownNode		37
+nim	mdkText	marvdown/ast.html#mdkText	MarkdownNodeKind.mdkText		11
+nim	mdkElement	marvdown/ast.html#mdkElement	MarkdownNodeKind.mdkElement		11
+nim	mdkCodeBlock	marvdown/ast.html#mdkCodeBlock	MarkdownNodeKind.mdkCodeBlock		11
+nim	mdkHeading	marvdown/ast.html#mdkHeading	MarkdownNodeKind.mdkHeading		11
+nim	mdkList	marvdown/ast.html#mdkList	MarkdownNodeKind.mdkList		11
+nim	mdkListItem	marvdown/ast.html#mdkListItem	MarkdownNodeKind.mdkListItem		11
+nim	mdkBlockquote	marvdown/ast.html#mdkBlockquote	MarkdownNodeKind.mdkBlockquote		11
+nim	mdkAlert	marvdown/ast.html#mdkAlert	MarkdownNodeKind.mdkAlert		11
+nim	mdkHorizontalRule	marvdown/ast.html#mdkHorizontalRule	MarkdownNodeKind.mdkHorizontalRule		11
+nim	mdkLink	marvdown/ast.html#mdkLink	MarkdownNodeKind.mdkLink		11
+nim	mdkImage	marvdown/ast.html#mdkImage	MarkdownNodeKind.mdkImage		11
+nim	mdkEmphasis	marvdown/ast.html#mdkEmphasis	MarkdownNodeKind.mdkEmphasis		11
+nim	mdkStrong	marvdown/ast.html#mdkStrong	MarkdownNodeKind.mdkStrong		11
+nim	mdkStrikethrough	marvdown/ast.html#mdkStrikethrough	MarkdownNodeKind.mdkStrikethrough		11
+nim	mdkInlineCode	marvdown/ast.html#mdkInlineCode	MarkdownNodeKind.mdkInlineCode		11
+nim	mdkLineBreak	marvdown/ast.html#mdkLineBreak	MarkdownNodeKind.mdkLineBreak		11
+nim	mdkHtml	marvdown/ast.html#mdkHtml	MarkdownNodeKind.mdkHtml		11
+nim	mdkTable	marvdown/ast.html#mdkTable	MarkdownNodeKind.mdkTable		11
+nim	mdkTableHeader	marvdown/ast.html#mdkTableHeader	MarkdownNodeKind.mdkTableHeader		11
+nim	mdkTableRow	marvdown/ast.html#mdkTableRow	MarkdownNodeKind.mdkTableRow		11
+nim	mdkTableFooter	marvdown/ast.html#mdkTableFooter	MarkdownNodeKind.mdkTableFooter		11
+nim	mdkTableCell	marvdown/ast.html#mdkTableCell	MarkdownNodeKind.mdkTableCell		11
+nim	mdkParagraph	marvdown/ast.html#mdkParagraph	MarkdownNodeKind.mdkParagraph		11
+nim	mdkFootnoteDef	marvdown/ast.html#mdkFootnoteDef	MarkdownNodeKind.mdkFootnoteDef		11
+nim	mdkFootnoteRef	marvdown/ast.html#mdkFootnoteRef	MarkdownNodeKind.mdkFootnoteRef		11
+nim	mdkDocument	marvdown/ast.html#mdkDocument	MarkdownNodeKind.mdkDocument		11
+nim	mdkUnknown	marvdown/ast.html#mdkUnknown	MarkdownNodeKind.mdkUnknown		11
+nim	MarkdownNodeKind	marvdown/ast.html#MarkdownNodeKind	enum MarkdownNodeKind		11
+nim	MarkdownNodeList	marvdown/ast.html#MarkdownNodeList	type MarkdownNodeList		40
+nim	MarkdownNode	marvdown/ast.html#MarkdownNode	type MarkdownNode		44
+nim	debugEcho	marvdown/ast.html#debugEcho,MarkdownNode	proc debugEcho(n: MarkdownNode)		104
+nim	newText	marvdown/ast.html#newText,string,int	proc newText(text: string; ln: int): MarkdownNode		107
+nim	newImage	marvdown/ast.html#newImage,string,string,string,int	proc newImage(alt, src, title: string; ln: int): MarkdownNode		112
+nim	newLink	marvdown/ast.html#newLink,string,string,int	proc newLink(href, title: string; ln: int): MarkdownNode		119
+nim	newRawHtml	marvdown/ast.html#newRawHtml,string,int	proc newRawHtml(html: string; ln: int): MarkdownNode		125
+nim	newHeading	marvdown/ast.html#newHeading,range[],int	proc newHeading(level: range[1 .. 6]; ln: int): MarkdownNode		130

@@ -16,13 +16,16 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.4">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.10">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.4"></script>
+<script type="text/javascript" src="../dochack.js?v=2.2.10"></script>
 </head>
 <body>
   <div class="document" id="documentId">
+    <input type="checkbox" id="nav-toggle" hidden>
+    <label for="nav-toggle" id="nav-burger">&#9776;</label>
+    <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">marvdown/parser</h1>
       <div class="row">
@@ -58,24 +61,46 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#HeadlineAnchor" title="HeadlineAnchor = string">HeadlineAnchor</a></li>
-<li><a class="reference" href="#Markdown" title="Markdown = ref object
-  ## Internal: The markdown parser instance
+      <li><a class="reference" href="#Markdown" title="Markdown {.acyclic.} = ref object
   minify*: bool              ## Minify the output HTML (default: true)
   opts*: MarkdownOptions     ## Options for allowed HTML tags and attributes
-  selectors*: CountTableRef[HeadlineAnchor] ## Internal: Used for generating unique headline anchors
-  ast*: seq[MarkdownNode]    ## The abstract syntax tree (AST) of the parsed markdown document">Markdown</a></li>
+  ast*: seq[MarkdownNode]    ## The abstract syntax tree (AST) of the parsed markdown document
+  footnotesHtml*: string     ## Generated HTML for footnotes at the end of the document
+  linkDefs*: TableRef[string, tuple[url, title: string]] ## Link definitions collected from the document (pre-scan)
+  scope*: ComponentScope     ## Component scope: variables set by @attr in imported HTML">Markdown</a></li>
 <li><a class="reference" href="#MarkdownOptions" title="MarkdownOptions = object
   allowed*: seq[HtmlTag] ## Allowed HTML tag names. See `defaultMarkdownOptions`
                          ## Marv is using `HtmlTag` from `std/htmlparser`
-                         ## **Attention!** An empty `@[]` means all tags are allowed.
-  allowTagsByType*: TagType ## Allow HTML tags by their types. Default `tagNone`
-                            ## This option is not used by default, instead, just a little
-                            ## list of `HtmlTag`. See `allowed` sequence
+                         ## **Attention!** An empty `@[]` means no tags are allowed.
+                         ## Use `allowTagsByType` to allow tags by category.
+  allowTagsByType*: Option[TagType] ## Allow HTML tags by their types. Default is `none(TagType)`.
   allowInlineStyle*: bool    ## Allow CSS styling using `style` tag (disabled by default)
   allowHtmlAttributes*: bool ## Allow using html attributes, `width`, `title` and so on.
                              ## For allowing use of `style` attribute, enable `allowInlineStyle`.
-  enableAnchors*: bool       ## Enable anchor generation in title blocks (enabled by default)">MarkdownOptions</a></li>
+  enableAnchors*: bool       ## Enable anchor generation in title blocks (enabled by default)
+  anchorIcon*: string = &quot;🔗&quot; ## Icon used for anchor links in headings
+  showFootnotes*: bool = true ## Insert footnotes HTML at the end of the document (default: true)
+  htmlTableClasses*: Option[seq[string]] ## Optional CSS classes to add to generated HTML tables (e.g., `[&quot;table&quot;, &quot;table-striped&quot;]` for Bootstrap tables)
+  enableEmailAutolinks*: bool ## Enable email autolinks in angle brackets (e.g., `&lt;user@example.com&gt;`)
+  enableComponents*: bool    ## Enable @include() directives and @attr/$variable in imported HTML
+  componentBaseDir*: string ## Base directory for resolving @include() paths. If empty,
+                            ## resolves relative to the current working directory.
+  customTransform*: proc (line: string): string ## Optional per-line parsing hook. Called for every body line (outside
+                                                ## fenced code blocks and the leading YAML front matter) before lexing.
+                                                ## Return a different string (possibly raw HTML) to replace the line;
+                                                ## return the input unchanged to keep it. Useful for custom syntax like
+                                                ## `@hello-world.md` that should render as rich HTML (e.g. a card) built
+                                                ## by the consumer. Default: nil (disabled).
+  lazyloadIframes*: bool ## Lazy-load iframes by rewriting the `src` attribute of `&lt;iframe&gt;`
+                         ## tags to `data-src` so they are only fetched when a client-side
+                         ## script swaps them back (e.g., via IntersectionObserver).
+                         ## Default: false
+  lazyloadVideos*: bool ## Lazy-load videos and audio by rewriting the `src` attribute of
+                        ## `&lt;video&gt;`, `&lt;audio&gt;` and `&lt;source&gt;` tags to `data-src`.
+                        ## Default: false
+  lazyloadImages*: bool ## Lazy-load images by rewriting the `src` attribute of `&lt;img&gt;` tags
+                        ## to `data-src`. Applies to both raw HTML and Markdown image syntax.
+                        ## Default: false">MarkdownOptions</a></li>
 <li><a class="reference" href="#MarkdownParser" title="MarkdownParser = object">MarkdownParser</a></li>
 <li><a class="reference" href="#TagType" title="TagType = enum
   tagNone, tagInline, tagBlock, tagAll">TagType</a></li>
@@ -91,12 +116,60 @@
   <li><a class="reference" href="#advance%2CMarkdown%2Cint" title="advance(md: var Markdown; offset = 1)">advance(md: var Markdown; offset = 1)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">decodeHtmlEntities
+  <li><a class="reference" href="#decodeHtmlEntities%2Cstring" title="decodeHtmlEntities(s: string): string">decodeHtmlEntities(s: string): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getFootnotes
+  <li><a class="reference" href="#getFootnotes%2CMarkdown" title="getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]">getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getHeader
+  <li><a class="reference" href="#getHeader%2CMarkdown" title="getHeader(md: Markdown): YAMLObject">getHeader(md: Markdown): YAMLObject</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getSelectorItems
+  <li><a class="reference" href="#getSelectorItems%2CMarkdown" title="getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]">getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getSelectors
+  <li><a class="reference" href="#getSelectors%2CMarkdown" title="getSelectors(md: Markdown): OrderedTableRef[string, string]">getSelectors(md: Markdown): OrderedTableRef[string, string]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getSelectorsList
+  <li><a class="reference" href="#getSelectorsList%2CMarkdown" title="getSelectorsList(md: Markdown): seq[string]">getSelectorsList(md: Markdown): seq[string]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">getTitle
+  <li><a class="reference" href="#getTitle%2CMarkdown" title="getTitle(md: Markdown): string">getTitle(md: Markdown): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">hasFootnotes
+  <li><a class="reference" href="#hasFootnotes%2CMarkdown" title="hasFootnotes(md: Markdown): bool">hasFootnotes(md: Markdown): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">hasSelectors
+  <li><a class="reference" href="#hasSelectors%2CMarkdown" title="hasSelectors(md: Markdown): bool">hasSelectors(md: Markdown): bool</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">lazyloadMediaSrc
+  <li><a class="reference" href="#lazyloadMediaSrc%2Csinkstring%2Cstring" title="lazyloadMediaSrc(html: sink string; tagName: string): string">lazyloadMediaSrc(html: sink string; tagName: string): string</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">newMarkdown
   <li><a class="reference" href="#newMarkdown%2Csinkstring%2CMarkdownOptions" title="newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown">newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">newParagraph
+  <li><a class="reference" href="#newParagraph%2CMarkdownTokenTuple" title="newParagraph(curr: MarkdownTokenTuple): MarkdownNode">newParagraph(curr: MarkdownTokenTuple): MarkdownNode</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">toHtml
-  <li><a class="reference" href="#toHtml%2CMarkdown" title="toHtml(md: Markdown): string">toHtml(md: Markdown): string</a></li>
+  <li><a class="reference" href="#toHtml%2CMarkdown" title="toHtml(md: var Markdown): string">toHtml(md: var Markdown): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">toJson
+  <li><a class="reference" href="#toJson%2CMarkdown" title="toJson(md: Markdown): string">toJson(md: Markdown): string</a></li>
 
 </ul>
 
@@ -115,27 +188,20 @@
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="lexer.html">lexer</a>, <a class="reference external" href="ast.html">ast</a>, <a class="reference external" href="renderer.html">renderer</a>
+    <a class="reference external" href="lexer.html">lexer</a>, <a class="reference external" href="ast.html">ast</a>, <a class="reference external" href="components.html">components</a>
   </dl>
 </div>
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="HeadlineAnchor">
-  <dt><pre><a href="parser.html#HeadlineAnchor"><span class="Identifier">HeadlineAnchor</span></a> <span class="Other">=</span> <span class="Identifier">string</span></pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-<div id="Markdown">
-  <dt><pre><a href="parser.html#Markdown"><span class="Identifier">Markdown</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
-  <span class="Comment">## Internal: The markdown parser instance</span>
+    <div id="Markdown">
+  <dt><pre><a href="#Markdown"><span class="Identifier">Markdown</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
   <span class="Identifier">minify</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>              <span class="Comment">## Minify the output HTML (default: true)</span>
-  <span class="Identifier">opts</span><span class="Operator">*</span><span class="Other">:</span> <a href="parser.html#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a>     <span class="Comment">## Options for allowed HTML tags and attributes</span>
-  <span class="Identifier">selectors</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">CountTableRef</span><span class="Other">[</span><a href="parser.html#HeadlineAnchor"><span class="Identifier">HeadlineAnchor</span></a><span class="Other">]</span> <span class="Comment">## Internal: Used for generating unique headline anchors</span>
-  <span class="Identifier">ast</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span>    <span class="Comment">## The abstract syntax tree (AST) of the parsed markdown document</span></pre></dt>
+  <span class="Identifier">opts</span><span class="Operator">*</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a>     <span class="Comment">## Options for allowed HTML tags and attributes</span>
+  <span class="Identifier">ast</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span>    <span class="Comment">## The abstract syntax tree (AST) of the parsed markdown document</span>
+  <span class="Identifier">footnotesHtml</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>     <span class="Comment">## Generated HTML for footnotes at the end of the document</span>
+  <span class="Identifier">linkDefs</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">TableRef</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">url</span><span class="Other">,</span> <span class="Identifier">title</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">]</span><span class="Other">]</span> <span class="Comment">## Link definitions collected from the document (pre-scan)</span>
+  <span class="Identifier">scope</span><span class="Operator">*</span><span class="Other">:</span> <a href="components.html#ComponentScope"><span class="Identifier">ComponentScope</span></a>     <span class="Comment">## Component scope: variables set by @attr in imported HTML</span></pre></dt>
   <dd>
     
     
@@ -143,17 +209,39 @@
   </dd>
 </div>
 <div id="MarkdownOptions">
-  <dt><pre><a href="parser.html#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <dt><pre><a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">allowed</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">HtmlTag</span><span class="Other">]</span> <span class="Comment">## Allowed HTML tag names. See `defaultMarkdownOptions`</span>
                          <span class="Comment">## Marv is using `HtmlTag` from `std/htmlparser`</span>
-                         <span class="Comment">## **Attention!** An empty `@[]` means all tags are allowed.</span>
-  <span class="Identifier">allowTagsByType</span><span class="Operator">*</span><span class="Other">:</span> <a href="parser.html#TagType"><span class="Identifier">TagType</span></a> <span class="Comment">## Allow HTML tags by their types. Default `tagNone`</span>
-                            <span class="Comment">## This option is not used by default, instead, just a little</span>
-                            <span class="Comment">## list of `HtmlTag`. See `allowed` sequence</span>
+                         <span class="Comment">## **Attention!** An empty `@[]` means no tags are allowed.</span>
+                         <span class="Comment">## Use `allowTagsByType` to allow tags by category.</span>
+  <span class="Identifier">allowTagsByType</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><a href="#TagType"><span class="Identifier">TagType</span></a><span class="Other">]</span> <span class="Comment">## Allow HTML tags by their types. Default is `none(TagType)`.</span>
   <span class="Identifier">allowInlineStyle</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>    <span class="Comment">## Allow CSS styling using `style` tag (disabled by default)</span>
   <span class="Identifier">allowHtmlAttributes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Allow using html attributes, `width`, `title` and so on.</span>
                              <span class="Comment">## For allowing use of `style` attribute, enable `allowInlineStyle`.</span>
-  <span class="Identifier">enableAnchors</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>       <span class="Comment">## Enable anchor generation in title blocks (enabled by default)</span></pre></dt>
+  <span class="Identifier">enableAnchors</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>       <span class="Comment">## Enable anchor generation in title blocks (enabled by default)</span>
+  <span class="Identifier">anchorIcon</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;🔗&quot;</span> <span class="Comment">## Icon used for anchor links in headings</span>
+  <span class="Identifier">showFootnotes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="DecNumber">true</span> <span class="Comment">## Insert footnotes HTML at the end of the document (default: true)</span>
+  <span class="Identifier">htmlTableClasses</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">]</span> <span class="Comment">## Optional CSS classes to add to generated HTML tables (e.g., `[&quot;table&quot;, &quot;table-striped&quot;]` for Bootstrap tables)</span>
+  <span class="Identifier">enableEmailAutolinks</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Enable email autolinks in angle brackets (e.g., `&lt;user@example.com&gt;`)</span>
+  <span class="Identifier">enableComponents</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>    <span class="Comment">## Enable @include() directives and @attr/$variable in imported HTML</span>
+  <span class="Identifier">componentBaseDir</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## Base directory for resolving @include() paths. If empty,</span>
+                            <span class="Comment">## resolves relative to the current working directory.</span>
+  <span class="Identifier">customTransform</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">line</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## Optional per-line parsing hook. Called for every body line (outside</span>
+                                                <span class="Comment">## fenced code blocks and the leading YAML front matter) before lexing.</span>
+                                                <span class="Comment">## Return a different string (possibly raw HTML) to replace the line;</span>
+                                                <span class="Comment">## return the input unchanged to keep it. Useful for custom syntax like</span>
+                                                <span class="Comment">## `@hello-world.md` that should render as rich HTML (e.g. a card) built</span>
+                                                <span class="Comment">## by the consumer. Default: nil (disabled).</span>
+  <span class="Identifier">lazyloadIframes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Lazy-load iframes by rewriting the `src` attribute of `&lt;iframe&gt;`</span>
+                         <span class="Comment">## tags to `data-src` so they are only fetched when a client-side</span>
+                         <span class="Comment">## script swaps them back (e.g., via IntersectionObserver).</span>
+                         <span class="Comment">## Default: false</span>
+  <span class="Identifier">lazyloadVideos</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Lazy-load videos and audio by rewriting the `src` attribute of</span>
+                        <span class="Comment">## `&lt;video&gt;`, `&lt;audio&gt;` and `&lt;source&gt;` tags to `data-src`.</span>
+                        <span class="Comment">## Default: false</span>
+  <span class="Identifier">lazyloadImages</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Lazy-load images by rewriting the `src` attribute of `&lt;img&gt;` tags</span>
+                        <span class="Comment">## to `data-src`. Applies to both raw HTML and Markdown image syntax.</span>
+                        <span class="Comment">## Default: false</span></pre></dt>
   <dd>
     
     
@@ -161,7 +249,7 @@
   </dd>
 </div>
 <div id="MarkdownParser">
-  <dt><pre><a href="parser.html#MarkdownParser"><span class="Identifier">MarkdownParser</span></a> <span class="Other">=</span> <span class="Keyword">object</span></pre></dt>
+  <dt><pre><a href="#MarkdownParser"><span class="Identifier">MarkdownParser</span></a> <span class="Other">=</span> <span class="Keyword">object</span></pre></dt>
   <dd>
     
     Internal: The parser state
@@ -169,7 +257,7 @@
   </dd>
 </div>
 <div id="TagType">
-  <dt><pre><a href="parser.html#TagType"><span class="Identifier">TagType</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <dt><pre><a href="#TagType"><span class="Identifier">TagType</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">tagNone</span><span class="Other">,</span> <span class="Identifier">tagInline</span><span class="Other">,</span> <span class="Identifier">tagBlock</span><span class="Other">,</span> <span class="Identifier">tagAll</span></pre></dt>
   <dd>
     
@@ -185,7 +273,7 @@
   <dl class="item">
     <div id="advance-procs-all">
   <div id="advance,Markdown,int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#advance%2CMarkdown%2Cint"><span class="Identifier">advance</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="parser.html#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">;</span> <span class="Identifier">offset</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#advance%2CMarkdown%2Cint"><span class="Identifier">advance</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">;</span> <span class="Identifier">offset</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -194,10 +282,127 @@
 </div>
 
 </div>
+<div id="decodeHtmlEntities-procs-all">
+  <div id="decodeHtmlEntities,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#decodeHtmlEntities%2Cstring"><span class="Identifier">decodeHtmlEntities</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Decode HTML entities in a string (e.g., <tt class="docutils literal"><span class="pre"><span class="Operator">&amp;</span><span class="Identifier">amp</span><span class="Punctuation">;</span></span></tt> → <tt class="docutils literal"><span class="pre"><span class="Operator">&amp;</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Operator">&amp;</span><span class="Comment">#123;</span></span></tt> → <tt class="docutils literal"><span class="pre"><span class="Punctuation">{</span></span></tt>). Unknown or malformed entities are passed through unchanged.
+    
+  </dd>
+</div>
+
+</div>
+<div id="getFootnotes-procs-all">
+  <div id="getFootnotes,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getFootnotes%2CMarkdown"><span class="Identifier">getFootnotes</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">OrderedTableRef</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Get the footnote definitions from the parsed Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="getHeader-procs-all">
+  <div id="getHeader,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getHeader%2CMarkdown"><span class="Identifier">getHeader</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">YAMLObject</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Get the parsed YAML front matter from the Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="getSelectorItems-procs-all">
+  <div id="getSelectorItems,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getSelectorItems%2CMarkdown"><span class="Identifier">getSelectorItems</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span>
+    <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">level</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">anchor</span><span class="Other">,</span> <span class="Identifier">title</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">]</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Get the headline selectors with their heading levels (1-6), in document order. Useful for building nested tables of contents.
+    
+  </dd>
+</div>
+
+</div>
+<div id="getSelectors-procs-all">
+  <div id="getSelectors,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getSelectors%2CMarkdown"><span class="Identifier">getSelectors</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">OrderedTableRef</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Get the headline selectors (anchors) from the parsed Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="getSelectorsList-procs-all">
+  <div id="getSelectorsList,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getSelectorsList%2CMarkdown"><span class="Identifier">getSelectorsList</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Get a sequence of headline selector values from the parsed Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="getTitle-procs-all">
+  <div id="getTitle,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#getTitle%2CMarkdown"><span class="Identifier">getTitle</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Retrieve the first heading as the document title
+    
+  </dd>
+</div>
+
+</div>
+<div id="hasFootnotes-procs-all">
+  <div id="hasFootnotes,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#hasFootnotes%2CMarkdown"><span class="Identifier">hasFootnotes</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Check if there are any footnote definitions in the parsed Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="hasSelectors-procs-all">
+  <div id="hasSelectors,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#hasSelectors%2CMarkdown"><span class="Identifier">hasSelectors</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Check if there are any headline selectors (anchors) in the parsed Markdown
+    
+  </dd>
+</div>
+
+</div>
+<div id="lazyloadMediaSrc-procs-all">
+  <div id="lazyloadMediaSrc,sinkstring,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#lazyloadMediaSrc%2Csinkstring%2Cstring"><span class="Identifier">lazyloadMediaSrc</span></a><span class="Other">(</span><span class="Identifier">html</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">tagName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Rewrites the <tt class="docutils literal"><span class="pre"><span class="Identifier">src</span></span></tt> attribute of <tt class="docutils literal"><span class="pre"><span class="Operator">&lt;</span><span class="Identifier">tagName</span><span class="Operator">&gt;</span></span></tt> opening tags to <tt class="docutils literal"><span class="pre"><span class="Identifier">data</span><span class="Operator">-</span><span class="Identifier">src</span></span></tt> so the media is not loaded until a client-side script swaps it back. Leaves the rest of the HTML untouched.
+    
+  </dd>
+</div>
+
+</div>
 <div id="newMarkdown-procs-all">
   <div id="newMarkdown,sinkstring,MarkdownOptions">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newMarkdown%2Csinkstring%2CMarkdownOptions"><span class="Identifier">newMarkdown</span></a><span class="Other">(</span><span class="Identifier">content</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">opts</span><span class="Other">:</span> <a href="parser.html#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <a href="parser.html#Markdown"><span class="Identifier">Markdown</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#newMarkdown%2Csinkstring%2CMarkdownOptions"><span class="Identifier">newMarkdown</span></a><span class="Other">(</span><span class="Identifier">content</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Create a new Markdown instance
@@ -206,12 +411,37 @@
 </div>
 
 </div>
+<div id="newParagraph-procs-all">
+  <div id="newParagraph,MarkdownTokenTuple">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newParagraph%2CMarkdownTokenTuple"><span class="Identifier">newParagraph</span></a><span class="Other">(</span><span class="Identifier">curr</span><span class="Other">:</span> <a href="lexer.html#MarkdownTokenTuple"><span class="Identifier">MarkdownTokenTuple</span></a><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Create a new empty paragraph node
+    
+  </dd>
+</div>
+
+</div>
 <div id="toHtml-procs-all">
   <div id="toHtml,Markdown">
-  <dt><pre><span class="Keyword">proc</span> <a href="#toHtml%2CMarkdown"><span class="Identifier">toHtml</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="parser.html#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#toHtml%2CMarkdown"><span class="Identifier">toHtml</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                        <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Convert the parsed Markdown AST to HTML
+    
+  </dd>
+</div>
+
+</div>
+<div id="toJson-procs-all">
+  <div id="toJson,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#toJson%2CMarkdown"><span class="Identifier">toJson</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Convert the parsed Markdown AST to JSON
     
   </dd>
 </div>
@@ -227,7 +457,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-13 05:59:54 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-16 10:45:27 UTC</small>
       </div>
     </div>
   </div>

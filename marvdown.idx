@@ -1,2 +1,7 @@
 nimTitle	marvdown	marvdown.html	module marvdown		0
-nim	htmlCommand	marvdown.html#htmlCommand,Values	proc htmlCommand(v: Values)		27
+nim	toHtml	marvdown.html#toHtml,sinkstring	proc toHtml(content: sink string): owned string		14
+nim	toXML	marvdown.html#toXML,sinkstring	proc toXML(content: sink string): XmlNode		19
+nim	toXML	marvdown.html#toXML,Markdown	proc toXML(md: var Markdown): XmlNode		24
+nim	getAst	marvdown.html#getAst,sinkstring	proc getAst(content: sink string): string		28
+nim	htmlCommand	marvdown.html#htmlCommand,Values	proc htmlCommand(v: Values)		64
+nimgrp	toxml	marvdown.html#toXML-procs-all	proc		19

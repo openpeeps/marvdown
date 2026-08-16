@@ -1,0 +1,7 @@
+nimTitle	components	marvdown/components.html	module marvdown/components		0
+nim	ComponentScope	marvdown/components.html#ComponentScope	type ComponentScope		3
+nim	newComponentScope	marvdown/components.html#newComponentScope	proc newComponentScope(): ComponentScope		5
+nim	resolveVariables	marvdown/components.html#resolveVariables,string,ComponentScope	proc resolveVariables(text: string; scope: ComponentScope): string		8
+nim	processHtmlContent	marvdown/components.html#processHtmlContent,sinkstring,ComponentScope	proc processHtmlContent(html: sink string; scope: var ComponentScope): string		35
+nim	preprocess	marvdown/components.html#preprocess,string,string,ComponentScope,seq[string]	proc preprocess(content: string; basePath: string; scope: var ComponentScope;\n           visited: var seq[string]): string		96
+nim	transformLines	marvdown/components.html#transformLines,string,proc(string)	proc transformLines(content: string; transform: proc (line: string): string): string		183

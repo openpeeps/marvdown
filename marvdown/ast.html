@@ -16,13 +16,16 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.4">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.10">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.4"></script>
+<script type="text/javascript" src="../dochack.js?v=2.2.10"></script>
 </head>
 <body>
   <div class="document" id="documentId">
+    <input type="checkbox" id="nav-toggle" hidden>
+    <label for="nav-toggle" id="nav-burger">&#9776;</label>
+    <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">marvdown/ast</h1>
       <div class="row">
@@ -58,46 +61,84 @@
       <li><a class="reference" href="#MarkdownNode" title="MarkdownNode {.acyclic.} = ref object
   case kind*: MarkdownNodeKind
   of mdkText:
-    text*: string
+    text*: string            ## Plain text content
   of mdkElement:
-    tag*: HtmlTag
-    attrs*: seq[(string, string)]
+    tag*: HtmlTag            ## HTML tag information
+    attrs*: seq[(string, string)] ## HTML attributes as (name, value) pairs
   of mdkCodeBlock:
-    code*: string
-    codeLang*: string
+    code*: string            ## Code block content
+    codeLang*: string        ## Language identifier (if any)
   of mdkHeading:
-    level*: int
-    textHeading*: string
+    level*: range[1 .. 6]    ## Heading level (1-6)
     textAnchor*: Option[string] ## Anchor for the heading (for linking)
                                 ## Generated if `enableAnchors` is true in `MarkdownOptions`
   of mdkList:
     listOrdered*: bool
+    listStart*: int
   of mdkLink:
-    linkHref*: string
-    linkTitle*: string
+    linkHref*: string        ## URL for the link
+    linkTitle*: string       ## Title text for the link
   of mdkImage:
-    imageSrc*: string
-    imageAlt*: string
-    imageTitle*: string
+    imageSrc*: string        ## Image source URL
+    imageAlt*: string        ## Alt text for the image
+    imageTitle*: string      ## Title text for the image
   of mdkInlineCode:
     inlineCode*: string      ## Inline code content
   of mdkHtml:
     html*: string            ## Raw HTML content
-  of mdkTable:
-    headers*: seq[string]
-    rows*: seq[seq[string]]
   of mdkUnknown:
     info*: string
+  of mdkFootnoteRef:
+    footnoteRefId*: string   ## Identifier for the footnote reference
+  of mdkFootnoteDef:
+    footnoteId*: string      ## Identifier for the footnote definition
+  of mdkAlert:
+    alertType*: string ## Alert type (NOTE, TIP, IMPORTANT, WARNING, CAUTION) used to
+                       ## select the Bootstrap alert class
   else:
     nil
-  children*: MarkdownNodeList ## Child nodes (for container nodes)">MarkdownNode</a></li>
+  children*: MarkdownNodeList ## Child nodes (for container nodes)
+  line*: int                 ## Line number in the source markdown">MarkdownNode</a></li>
 <li><a class="reference" href="#MarkdownNodeKind" title="MarkdownNodeKind = enum
   mdkText, mdkElement, mdkCodeBlock, mdkHeading, mdkList, mdkListItem,
-  mdkBlockquote, mdkHorizontalRule, mdkLink, mdkImage, mdkEmphasis, mdkStrong,
-  mdkInlineCode, mdkLineBreak, mdkHtml, mdkTable, mdkParagraph, mdkDocument,
-  mdkUnknown">MarkdownNodeKind</a></li>
+  mdkBlockquote, mdkAlert, mdkHorizontalRule, mdkLink, mdkImage, mdkEmphasis,
+  mdkStrong, mdkStrikethrough, mdkInlineCode, mdkLineBreak, mdkHtml, mdkTable,
+  mdkTableHeader, mdkTableRow, mdkTableFooter, mdkTableCell, mdkParagraph,
+  mdkFootnoteDef, mdkFootnoteRef, mdkDocument, mdkUnknown">MarkdownNodeKind</a></li>
 <li><a class="reference" href="#MarkdownNodeList" title="MarkdownNodeList {.acyclic.} = ref object
   items*: seq[MarkdownNode]  ## Child nodes (for container nodes)">MarkdownNodeList</a></li>
+
+    </ul>
+  </details>
+</li>
+<li>
+  <details open>
+    <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
+    <ul class="simple simple-toc-section">
+      <ul class="simple nested-toc-section">debugEcho
+  <li><a class="reference" href="#debugEcho%2CMarkdownNode" title="debugEcho(n: MarkdownNode)">debugEcho(n: MarkdownNode)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newHeading
+  <li><a class="reference" href="#newHeading%2Crange%5B%5D%2Cint" title="newHeading(level: range[1 .. 6]; ln: int): MarkdownNode">newHeading(level: range[1 .. 6]; ln: int): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newImage
+  <li><a class="reference" href="#newImage%2Cstring%2Cstring%2Cstring%2Cint" title="newImage(alt, src, title: string; ln: int): MarkdownNode">newImage(alt, src, title: string; ln: int): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newLink
+  <li><a class="reference" href="#newLink%2Cstring%2Cstring%2Cint" title="newLink(href, title: string; ln: int): MarkdownNode">newLink(href, title: string; ln: int): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newRawHtml
+  <li><a class="reference" href="#newRawHtml%2Cstring%2Cint" title="newRawHtml(html: string; ln: int): MarkdownNode">newRawHtml(html: string; ln: int): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">newText
+  <li><a class="reference" href="#newText%2Cstring%2Cint" title="newText(text: string; ln: int): MarkdownNode">newText(text: string; ln: int): MarkdownNode</a></li>
+
+</ul>
 
     </ul>
   </details>
@@ -115,42 +156,47 @@
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
     <div id="MarkdownNode">
-  <dt><pre><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
-  <span class="Keyword">case</span> <span class="Identifier">kind</span><span class="Operator">*</span><span class="Other">:</span> <a href="ast.html#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a>
+  <dt><pre><a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
+  <span class="Keyword">case</span> <span class="Identifier">kind</span><span class="Operator">*</span><span class="Other">:</span> <a href="#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a>
   <span class="Keyword">of</span> <span class="Identifier">mdkText</span><span class="Other">:</span>
-    <span class="Identifier">text</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+    <span class="Identifier">text</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>            <span class="Comment">## Plain text content</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkElement</span><span class="Other">:</span>
-    <span class="Identifier">tag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HtmlTag</span>
-    <span class="Identifier">attrs</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span>
+    <span class="Identifier">tag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HtmlTag</span>            <span class="Comment">## HTML tag information</span>
+    <span class="Identifier">attrs</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">]</span> <span class="Comment">## HTML attributes as (name, value) pairs</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkCodeBlock</span><span class="Other">:</span>
-    <span class="Identifier">code</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-    <span class="Identifier">codeLang</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+    <span class="Identifier">code</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>            <span class="Comment">## Code block content</span>
+    <span class="Identifier">codeLang</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>        <span class="Comment">## Language identifier (if any)</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkHeading</span><span class="Other">:</span>
-    <span class="Identifier">level</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
-    <span class="Identifier">textHeading</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+    <span class="Identifier">level</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">range</span><span class="Other">[</span><span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">6</span><span class="Other">]</span>    <span class="Comment">## Heading level (1-6)</span>
     <span class="Identifier">textAnchor</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## Anchor for the heading (for linking)</span>
                                 <span class="Comment">## Generated if `enableAnchors` is true in `MarkdownOptions`</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkList</span><span class="Other">:</span>
     <span class="Identifier">listOrdered</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+    <span class="Identifier">listStart</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkLink</span><span class="Other">:</span>
-    <span class="Identifier">linkHref</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-    <span class="Identifier">linkTitle</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+    <span class="Identifier">linkHref</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>        <span class="Comment">## URL for the link</span>
+    <span class="Identifier">linkTitle</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>       <span class="Comment">## Title text for the link</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkImage</span><span class="Other">:</span>
-    <span class="Identifier">imageSrc</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-    <span class="Identifier">imageAlt</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
-    <span class="Identifier">imageTitle</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+    <span class="Identifier">imageSrc</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>        <span class="Comment">## Image source URL</span>
+    <span class="Identifier">imageAlt</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>        <span class="Comment">## Alt text for the image</span>
+    <span class="Identifier">imageTitle</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>      <span class="Comment">## Title text for the image</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkInlineCode</span><span class="Other">:</span>
     <span class="Identifier">inlineCode</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>      <span class="Comment">## Inline code content</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkHtml</span><span class="Other">:</span>
     <span class="Identifier">html</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>            <span class="Comment">## Raw HTML content</span>
-  <span class="Keyword">of</span> <span class="Identifier">mdkTable</span><span class="Other">:</span>
-    <span class="Identifier">headers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
-    <span class="Identifier">rows</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">]</span>
   <span class="Keyword">of</span> <span class="Identifier">mdkUnknown</span><span class="Other">:</span>
     <span class="Identifier">info</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Keyword">of</span> <span class="Identifier">mdkFootnoteRef</span><span class="Other">:</span>
+    <span class="Identifier">footnoteRefId</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>   <span class="Comment">## Identifier for the footnote reference</span>
+  <span class="Keyword">of</span> <span class="Identifier">mdkFootnoteDef</span><span class="Other">:</span>
+    <span class="Identifier">footnoteId</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>      <span class="Comment">## Identifier for the footnote definition</span>
+  <span class="Keyword">of</span> <span class="Identifier">mdkAlert</span><span class="Other">:</span>
+    <span class="Identifier">alertType</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## Alert type (NOTE, TIP, IMPORTANT, WARNING, CAUTION) used to</span>
+                       <span class="Comment">## select the Bootstrap alert class</span>
   <span class="Keyword">else</span><span class="Other">:</span>
     <span class="Keyword">nil</span>
-  <span class="Identifier">children</span><span class="Operator">*</span><span class="Other">:</span> <a href="ast.html#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a> <span class="Comment">## Child nodes (for container nodes)</span></pre></dt>
+  <span class="Identifier">children</span><span class="Operator">*</span><span class="Other">:</span> <a href="#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a> <span class="Comment">## Child nodes (for container nodes)</span>
+  <span class="Identifier">line</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>                 <span class="Comment">## Line number in the source markdown</span></pre></dt>
   <dd>
     
     
@@ -158,11 +204,12 @@
   </dd>
 </div>
 <div id="MarkdownNodeKind">
-  <dt><pre><a href="ast.html#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <dt><pre><a href="#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">mdkText</span><span class="Other">,</span> <span class="Identifier">mdkElement</span><span class="Other">,</span> <span class="Identifier">mdkCodeBlock</span><span class="Other">,</span> <span class="Identifier">mdkHeading</span><span class="Other">,</span> <span class="Identifier">mdkList</span><span class="Other">,</span> <span class="Identifier">mdkListItem</span><span class="Other">,</span>
-  <span class="Identifier">mdkBlockquote</span><span class="Other">,</span> <span class="Identifier">mdkHorizontalRule</span><span class="Other">,</span> <span class="Identifier">mdkLink</span><span class="Other">,</span> <span class="Identifier">mdkImage</span><span class="Other">,</span> <span class="Identifier">mdkEmphasis</span><span class="Other">,</span> <span class="Identifier">mdkStrong</span><span class="Other">,</span>
-  <span class="Identifier">mdkInlineCode</span><span class="Other">,</span> <span class="Identifier">mdkLineBreak</span><span class="Other">,</span> <span class="Identifier">mdkHtml</span><span class="Other">,</span> <span class="Identifier">mdkTable</span><span class="Other">,</span> <span class="Identifier">mdkParagraph</span><span class="Other">,</span> <span class="Identifier">mdkDocument</span><span class="Other">,</span>
-  <span class="Identifier">mdkUnknown</span></pre></dt>
+  <span class="Identifier">mdkBlockquote</span><span class="Other">,</span> <span class="Identifier">mdkAlert</span><span class="Other">,</span> <span class="Identifier">mdkHorizontalRule</span><span class="Other">,</span> <span class="Identifier">mdkLink</span><span class="Other">,</span> <span class="Identifier">mdkImage</span><span class="Other">,</span> <span class="Identifier">mdkEmphasis</span><span class="Other">,</span>
+  <span class="Identifier">mdkStrong</span><span class="Other">,</span> <span class="Identifier">mdkStrikethrough</span><span class="Other">,</span> <span class="Identifier">mdkInlineCode</span><span class="Other">,</span> <span class="Identifier">mdkLineBreak</span><span class="Other">,</span> <span class="Identifier">mdkHtml</span><span class="Other">,</span> <span class="Identifier">mdkTable</span><span class="Other">,</span>
+  <span class="Identifier">mdkTableHeader</span><span class="Other">,</span> <span class="Identifier">mdkTableRow</span><span class="Other">,</span> <span class="Identifier">mdkTableFooter</span><span class="Other">,</span> <span class="Identifier">mdkTableCell</span><span class="Other">,</span> <span class="Identifier">mdkParagraph</span><span class="Other">,</span>
+  <span class="Identifier">mdkFootnoteDef</span><span class="Other">,</span> <span class="Identifier">mdkFootnoteRef</span><span class="Other">,</span> <span class="Identifier">mdkDocument</span><span class="Other">,</span> <span class="Identifier">mdkUnknown</span></pre></dt>
   <dd>
     
     
@@ -170,13 +217,91 @@
   </dd>
 </div>
 <div id="MarkdownNodeList">
-  <dt><pre><a href="ast.html#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
-  <span class="Identifier">items</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span>  <span class="Comment">## Child nodes (for container nodes)</span></pre></dt>
+  <dt><pre><a href="#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
+  <span class="Identifier">items</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span>  <span class="Comment">## Child nodes (for container nodes)</span></pre></dt>
   <dd>
     
     
     
   </dd>
+</div>
+
+  </dl>
+</div>
+<div class="section" id="12">
+  <h1><a class="toc-backref" href="#12">Procs</a></h1>
+  <dl class="item">
+    <div id="debugEcho-procs-all">
+  <div id="debugEcho,MarkdownNode">
+  <dt><pre><span class="Keyword">proc</span> <a href="#debugEcho%2CMarkdownNode"><span class="Identifier">debugEcho</span></a><span class="Other">(</span><span class="Identifier">n</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                  <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="newHeading-procs-all">
+  <div id="newHeading,range[],int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newHeading%2Crange%5B%5D%2Cint"><span class="Identifier">newHeading</span></a><span class="Other">(</span><span class="Identifier">level</span><span class="Other">:</span> <span class="Identifier">range</span><span class="Other">[</span><span class="DecNumber">1</span> <span class="Operator">..</span> <span class="DecNumber">6</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">ln</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Create a new heading node
+    
+  </dd>
+</div>
+
+</div>
+<div id="newImage-procs-all">
+  <div id="newImage,string,string,string,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newImage%2Cstring%2Cstring%2Cstring%2Cint"><span class="Identifier">newImage</span></a><span class="Other">(</span><span class="Identifier">alt</span><span class="Other">,</span> <span class="Identifier">src</span><span class="Other">,</span> <span class="Identifier">title</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">ln</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="newLink-procs-all">
+  <div id="newLink,string,string,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newLink%2Cstring%2Cstring%2Cint"><span class="Identifier">newLink</span></a><span class="Other">(</span><span class="Identifier">href</span><span class="Other">,</span> <span class="Identifier">title</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">ln</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="newRawHtml-procs-all">
+  <div id="newRawHtml,string,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newRawHtml%2Cstring%2Cint"><span class="Identifier">newRawHtml</span></a><span class="Other">(</span><span class="Identifier">html</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">ln</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="newText-procs-all">
+  <div id="newText,string,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newText%2Cstring%2Cint"><span class="Identifier">newText</span></a><span class="Other">(</span><span class="Identifier">text</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">ln</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
 </div>
 
   </dl>
@@ -188,7 +313,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2025-09-13 05:59:54 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-16 10:45:27 UTC</small>
       </div>
     </div>
   </div>
