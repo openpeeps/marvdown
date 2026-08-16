@@ -1,54 +1,8 @@
 name: test
-on:
-  push:
-    paths-ignore:
-      - LICENSE
-      - README.*
-      - examples
-      - .github/workflows
-  pull_request:
-    paths-ignore:
-      - LICENSE
-      - README.*
-      - examples
-      - .github/workflows
+on: [push, pull_request]
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        nim-version:
-          - 'stable'
-        os:
-          - ubuntu-latest
-          # - macOS-latest
-          # - windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: ${{ matrix.nim-version }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      
-      # - name: Install PCRE dependencies (Ubuntu)
-      #   if: runner.os == 'Linux'
-      #   run: sudo apt-get update && sudo apt-get install -y libpcre3 libpcre3-dev
-      
-      # - name: Install PCRE dependencies (macOS)
-      #   if: runner.os == 'macOS'
-      #   run: brew install pcre
-
-      # - name: Install OpenSSL (Windows)
-      #   if: runner.os == 'Windows'
-      #   run: choco install openssl
-
-      # - name: Install PCRE dependencies (Windows)
-      #   if: runner.os == 'Windows'
-      #   run: choco install pcre
-      - name: "Install kapsis for CLI app"
-        run: nimble install kapsis@#head
-
-      - run: nimble install -Y
-      - run: nim c -r src/${{ github.event.repository.name }}.nim
-      - run: nimble test
-
+    uses: nimbase/setup-nim-action/.github/workflows/test.yml@main
+    with:
+      pre-test-command: | # required to build the CLI
+        nimble install kapsis 

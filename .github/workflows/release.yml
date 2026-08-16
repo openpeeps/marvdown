@@ -1,0 +1,13 @@
+name: release
+on:
+  push:
+    tags: ['*.*.*']
+  workflow_dispatch:
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: nimbase/setup-nim-action/.github/workflows/release.yml@main
+    with:
+      nim-version: stable
+      app-name: marvdown
