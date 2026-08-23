@@ -843,6 +843,21 @@ suite "elements_inline_formatting":
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<p>*unclosed</p>"
 
+  test "intraword underscore is literal text":
+    let sample = "5_000 and 1_000_000 and snake_case_name"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>5_000 and 1_000_000 and snake_case_name</p>"
+
+  test "underscore emphasis still works when not intraword":
+    let sample = "This is _italic_ text."
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>This is <em>italic</em> text.</p>"
+
+  test "star emphasis still works intraword":
+    let sample = "un*frigging*believable"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>un<em>frigging</em>believable</p>"
+
   test "inline code":
     let sample = "Use `code` inline."
     var md = newMarkdown(sample, noAnchors)

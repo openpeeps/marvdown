@@ -425,6 +425,13 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return result
 
     if ch == '_':
+      # Intraword underscore (e.g. `5_000`, `snake_case`) is literal text,
+      # not emphasis/strong. Word chars on both sides of the run.
+      let prevIdx = lex.pos - count - 1
+      let prev = if prevIdx >= 0: lex.input[prevIdx] else: '\0'
+      let next = lex.current
+      if prev in IdentChars and next in IdentChars:
+        return newTokenTuple(lex, mtkText, repeat(ch, count))
       # Emphasis or strong with underscore
       # NOTE: the counting loop above already consumed all underscore chars,
       # so use `count` (not `peek`) to decide between strong and emphasis.
