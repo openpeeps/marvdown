@@ -863,6 +863,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       htmlContent.add(lex.current)
       lex.advance()
     return newTokenTuple(lex, mtkHtml, htmlContent, attrs=some(@[tag]))
+  of ']':
+    lex.advance()
+    return newTokenTuple(lex, mtkText, "]")
   of '|':
     lex.advance()
     return newTokenTuple(lex, mtkTable, "|")
@@ -881,8 +884,7 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       lex.advance()
       return newTokenTuple(lex, mtkText, ch)
     else:
-      # Not escapable — emit literal backslash
-      lex.advance()
+      # Not escapable — emit literal backslash, leave next char for next token
       return newTokenTuple(lex, mtkText, "\\")
   else:
     # Paragraph or plain text
@@ -892,6 +894,10 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       if tokens.len > 1:
         lex.pendingTokens = tokens[1..^1]
       return tokens[0]
+    if lex.current != '\0':
+      let ch = $lex.current
+      lex.advance()
+      return newTokenTuple(lex, mtkText, ch)
     return newTokenTuple(lex, mtkUnknown)
 
 when isMainModule:
