@@ -103,7 +103,9 @@ let opts = MarkdownOptions(
 
   lazyloadIframes: false,    # <iframe src> → data-src
   lazyloadVideos: false,     # <video>/<audio>/<source> src → data-src
-  lazyloadImages: false      # <img> & ![alt](url) src → data-src
+  lazyloadImages: false,     # <img> & ![alt](url) src → data-src
+
+  parseYaml: true            # parse YAML front matter (--- blocks); set false to skip for speed
 )
 ```
 
@@ -329,15 +331,61 @@ nim c src/marvdown.nim
 ```
 
 ## Benchmarks
-Marvdown is super fast! It can parse large markdown files in milliseconds. Here is a quick benchmark
-over 100K lines of markdown text (~5.3 MB)
+Marvdown is super fast! Run `nim c -d:release -r tests/test_benchmark.nim` (options `allowTagsByType: tagAll`, `parseYaml: false`):
 
 ```
-Benchmark 1: marvdown html bigdoc.md
-  Time (abs ≡):        188.1 ms               [User: 166.9 ms, System: 19.8 ms]
+Marvdown Benchmark – toHtml (wall time, release)
+==================================================
+
+| Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+| sample.md (CommonMark)   | 27.1 KB    |     500 |     235.60 |      0.471 |       56.23 MB/s |    27.9 KB |     235.17 |
+| tests/data/big.md        | 4.84 MB    |       5 |     793.93 |    158.786 |       30.47 MB/s |    6.15 MB |     790.63 |
+| synthetic 100 lines      | 4.2 KB     |     200 |      35.65 |      0.178 |       23.23 MB/s |     6.8 KB |      35.59 |
+| synthetic 1k lines       | 43.8 KB    |      50 |      91.66 |      1.833 |       23.31 MB/s |    68.9 KB |      90.98 |
+| synthetic 10k lines      | 451.2 KB   |       5 |     116.73 |     23.346 |       18.87 MB/s |   703.1 KB |     116.29 |
+| tiny 1 line              | 14 B       |    1000 |       1.88 |      0.002 |        7.10 MB/s |       26 B |       1.88 |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+  Iterations: 1760  |  Total wall: 1275.46 ms
 ```
 
-_Benchmark made with [hyperfine](https://github.com/sharkdp/hyperfine)_
+```
+Marvdown Benchmark – toHtml + anchors
+=======================================
+
+| Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+| sample.md (CommonMark) + | 27.1 KB    |     250 |     121.66 |      0.487 |       54.45 MB/s |    28.0 KB |     121.27 |
+| synthetic 1k lines +anch | 43.8 KB    |      25 |      47.63 |      1.905 |       22.42 MB/s |    75.6 KB |      47.52 |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+  Iterations: 275  |  Total wall: 169.29 ms
+```
+
+```
+Marvdown Benchmark – toHtml vs toJson (sample.md)
+===================================================
+
+| Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+| sample toHtml            | 27.1 KB    |     100 |      49.15 |      0.491 |       53.91 MB/s |    27.9 KB |      49.01 |
+| sample toJson            | 27.1 KB    |     100 |      66.33 |      0.663 |       39.95 MB/s |    42.6 KB |      66.10 |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+  Iterations: 200  |  Total wall: 115.47 ms
+```
+
+```
+Scaling check – 100 vs 1k lines
+=================================
+
+| Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+| 100 lines                | 4.2 KB     |     100 |      18.70 |      0.187 |       22.15 MB/s |     6.8 KB |      18.50 |
+| 1k lines                 | 43.8 KB    |      20 |      36.27 |      1.814 |       23.56 MB/s |    68.9 KB |      36.12 |
+|--------------------------|------------|---------|------------|------------|------------------|------------|------------|
+  Iterations: 120  |  Total wall: 54.97 ms
+```
+
+_Benchmark via `tests/test_benchmark.nim` plain-text table; `Nim 2.2.10`, `macOS amd64`. Re-run with `nim c -d:release -r tests/test_benchmark.nim`._
 
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/marvdown/issues)
