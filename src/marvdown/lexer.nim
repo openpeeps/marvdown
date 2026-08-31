@@ -51,6 +51,7 @@ type
     pos*, line*, col*: int
     strbuf*: string
     pendingTokens: seq[MarkdownTokenTuple] # Buffer for tokens split from text
+    pendingIdx: int                        # cursor into pendingTokens (avoid O(n²) slice)
     enableEmailAutolinks*: bool
 
 #
@@ -62,6 +63,8 @@ proc initLexer*(input: sink string, enableEmailAutolinks: bool = false): Markdow
   result.line = 1
   result.col = 0
   result.strbuf = ""
+  result.pendingTokens = @[]
+  result.pendingIdx = 0
   result.enableEmailAutolinks = enableEmailAutolinks
   if input.len > 0:
     result.current = input[0]
@@ -292,10 +295,14 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
   # this must be checked before looking for new tokens or EOF,
   # otherwise we might miss auto-link tokens that are generated from text scanning.
 
-  if lex.pendingTokens.len > 0:
-    let tok = lex.pendingTokens[0]
-    lex.pendingTokens = lex.pendingTokens[1..^1]
-    return tok
+  if lex.pendingIdx < lex.pendingTokens.len:
+    result = lex.pendingTokens[lex.pendingIdx]
+    inc lex.pendingIdx
+    if lex.pendingIdx == lex.pendingTokens.len:
+      # all consumed — reset to avoid unbounded growth
+      lex.pendingTokens.setLen(0)
+      lex.pendingIdx = 0
+    return result
 
   # Skip newlines and detect paragraph breaks
   var newlineCount = 0
@@ -892,7 +899,13 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     let tokens = lex.scanTextWithLinks() # This should be optional, no?
     if tokens.len > 0:
       if tokens.len > 1:
-        lex.pendingTokens = tokens[1..^1]
+        # append tail to pending buffer without O(n²) slice on nextToken
+        if lex.pendingIdx < lex.pendingTokens.len:
+          # should not happen (we already drained pending at entry), but handle
+          lex.pendingTokens.add(tokens[1..^1])
+        else:
+          lex.pendingTokens = tokens[1..^1]
+          lex.pendingIdx = 0
       return tokens[0]
     if lex.current != '\0':
       let ch = $lex.current

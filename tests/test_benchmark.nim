@@ -14,7 +14,8 @@ let benchOpts = MarkdownOptions(
   allowTagsByType: some(tagAll),
   enableAnchors: false,
   enableEmailAutolinks: true,
-  showFootnotes: true
+  showFootnotes: true,
+  parseYaml: false
 )
 
 let benchOptsAnchors = MarkdownOptions(
@@ -22,7 +23,8 @@ let benchOptsAnchors = MarkdownOptions(
   allowTagsByType: some(tagAll),
   enableAnchors: true,
   anchorIcon: "🔗",
-  enableEmailAutolinks: true
+  enableEmailAutolinks: true,
+  parseYaml: false
 )
 
 type BenchResult = object

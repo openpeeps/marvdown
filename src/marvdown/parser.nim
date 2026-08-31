@@ -98,6 +98,10 @@ type
       ## Lazy-load images by rewriting the `src` attribute of `<img>` tags
       ## to `data-src`. Applies to both raw HTML and Markdown image syntax.
       ## Default: false
+    parseYaml*: bool = true
+      ## Parse YAML front matter (`---` blocks) into `headerYaml`. Disable
+      ## for speed when YAML is not needed (e.g., pure benchmarking).
+      ## Default: true
 
 #
 # forward declarations
@@ -507,6 +511,115 @@ proc parseInlineNode(md: var Markdown, lex: var MarkdownLexer, curr: var Markdow
     curr = lex.nextToken()
 
 proc parseInline(md: var Markdown, text: sink string): seq[MarkdownNode] =
+  if text.len == 0: return
+  var hasSpecial = false
+  for c in text:
+    if c in {'*','_','[',']','!','`','<','\\','~','|'}:
+      hasSpecial = true; break
+  # don't fast-path block-level markers at start of inline fragment
+  # (e.g. "> bar" inside blockquote, "## header" inside blockquote)
+  if text.len > 0 and text[0] in {'>', '#', '-', '=', '|', '+', '0'..'9'}:
+    # fallback to lexer to handle block markers correctly – skip plain fast path
+    discard
+  elif not hasSpecial:
+    # fast path: plain text without inline markup -> avoid lexer alloc
+    # autolinks like http:// are detected inside scanTextWithLinks,
+    # so only bypass lexer when no http prefix present
+    if find(text, "http") < 0:
+      return @[newText(text, 1)]
+  # fast path for **strong** (+ `code`) fragments common in big.md list items
+  # e.g. "**Event loop** — description" or "thread-safe `postToLoop`"
+  # avoid full lexer for 25k items
+  if hasSpecial and text.len >= 4 and not (text.len>0 and text[0] in {'>', '#'}):
+    let hasStrong = find(text, "**") >= 0
+    let hasCode = find(text, "`") >= 0
+    if hasStrong or hasCode:
+      var hasOtherSpecial = false
+      for c in text:
+        if c in {'[',']','!','<','\\','~','|'}:
+          hasOtherSpecial = true; break
+        if c == '_' :
+          hasOtherSpecial = true; break
+      if not hasOtherSpecial and find(text, "http") < 0:
+        # only * and ` are special – try to build nodes without lexer
+        var backtickCount = 0
+        for c in text:
+          if c == '`': inc backtickCount
+        if backtickCount mod 2 != 0:
+          hasOtherSpecial = true
+        if not hasOtherSpecial:
+          var starCount = 0
+          for c in text:
+            if c == '*': inc starCount
+          # detect single-star emphasis (e.g. *italic*) – fallback to lexer
+          var hasSingleStar = false
+          for i, c in text:
+            if c == '*':
+              let left = i > 0 and text[i-1] == '*'
+              let right = i+1 < text.len and text[i+1] == '*'
+              if not (left or right):
+                hasSingleStar = true; break
+          if hasSingleStar:
+            hasOtherSpecial = true
+          let onlyCode = not hasStrong
+          let onlyStrong = not hasCode
+          var canFast = false
+          if not hasOtherSpecial:
+            if onlyCode and backtickCount >= 2:
+              canFast = find(text, "``") < 0  # single backticks only
+            elif onlyStrong and starCount >= 2 and starCount mod 2 == 0:
+              canFast = find(text, "***") < 0 and find(text, "* *") < 0 and not hasSingleStar
+            elif starCount mod 2 == 0 and backtickCount mod 2 == 0 and starCount >= 2 and backtickCount >= 2:
+              canFast = find(text, "***") < 0 and not hasSingleStar
+            elif hasStrong and starCount >= 2 and starCount mod 2 == 0 and backtickCount == 0:
+              canFast = find(text, "***") < 0 and not hasSingleStar
+          if canFast:
+            var outp: seq[MarkdownNode] = @[]
+            var pos = 0
+            var ok = true
+            while pos < text.len:
+              let nextStrong = find(text, "**", pos)
+              let nextCode = find(text, "`", pos)
+              var s = -1
+              var isCode = false
+              if nextStrong >= 0 and nextCode >= 0:
+                if nextStrong < nextCode:
+                  s = nextStrong
+                else:
+                  s = nextCode; isCode = true
+              elif nextStrong >= 0:
+                s = nextStrong
+              elif nextCode >= 0:
+                s = nextCode; isCode = true
+              else:
+                if pos < text.len:
+                  let tail = text[pos..^1]
+                  if tail.len > 0:
+                    outp.add(newText(tail, 1))
+                break
+              if s > pos:
+                let before = text[pos..<s]
+                if before.len > 0:
+                  outp.add(newText(before, 1))
+              if isCode:
+                let e = find(text, "`", s+1)
+                if e < 0: ok = false; break
+                let inner = text[s+1..<e]
+                if find(inner, "`") >= 0: ok = false; break
+                let codeNode = MarkdownNode(kind: mdkInlineCode, inlineCode: inner, line: 1)
+                outp.add(codeNode)
+                pos = e + 1
+              else:
+                let e = find(text, "**", s+2)
+                if e < 0: ok = false; break
+                let inner = text[s+2..<e]
+                if inner.len == 0 or find(inner, "*") >= 0 or find(inner, "`") >= 0: ok = false; break
+                let innerNode = newText(inner, 1)
+                let strongNode = MarkdownNode(kind: mdkStrong, children: MarkdownNodeList(items: @[innerNode]), line: 1)
+                outp.add(strongNode)
+                pos = e + 2
+            if ok and outp.len > 0:
+              return outp
   var lex = initLexer(text)
   var curr = lex.nextToken()
   let ln = curr.line
@@ -1040,16 +1153,17 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
     # YAML Front Matter
     #
     of mtkDocument:
-      try:
-        # Parse YAML front matter
-        md.headerYaml = parseYAML(curr.token)
-      except OpenParserYamlError as e:
-        # On error, add a text node with the error message
-        md.ast.add(MarkdownNode(
-          kind: mdkText,
-          text: curr.token, # invalid YAML, just add as text
-          line: curr.line
-        ))
+      if md.opts.parseYaml:
+        try:
+          # Parse YAML front matter
+          md.headerYaml = parseYAML(curr.token)
+        except OpenParserYamlError as e:
+          # On error, add a text node with the error message
+          md.ast.add(MarkdownNode(
+            kind: mdkText,
+            text: curr.token, # invalid YAML, just add as text
+            line: curr.line
+          ))
       md.advance()
     #
     # Footnotes
@@ -1075,6 +1189,10 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
 proc collectLinkDefs(content: string): TableRef[string, tuple[url, title: string]] =
   ## Pre-scan the document for link definitions: [label]: url "title"
   result = newTable[string, tuple[url, title: string]]()
+  # fast reject: link defs require "]:" (avoid 5MB lex when absent)
+  if content.len < 4: return
+  if find(content, "]:") < 0:
+    return
   var lex = initLexer(content)
   var tok = lex.nextToken()
   while tok.kind != mtkEOF:
@@ -1179,6 +1297,11 @@ proc getTitle*(md: Markdown): string =
 proc decodeHtmlEntities*(s: string): string =
   ## Decode HTML entities in a string (e.g., `&amp;` → `&`, `&#123;` → `{`).
   ## Unknown or malformed entities are passed through unchanged.
+  if s.len == 0 or find(s, '&') < 0:
+    return s
+  # fast reject if '&' but no ';' after it
+  if find(s, ';') < 0:
+    return s
   result = newStringOfCap(s.len)
   var i = 0
   while i < s.len:
