@@ -17,6 +17,7 @@
 
 ## 😍 Key Features
 - [x] Extremely Fast & Lightweight! [Check benchmarks](#benchmarks)
+- [x] CommonMark compliant
 - [x] Compiled cross-platform CLI app
 - [x] Nim library for easy integration in your 👑 Nim projects
 - [x] Markdown to HTML
@@ -112,14 +113,6 @@ let opts = MarkdownOptions(
 ## Features
 
 ### Headings & anchors
-```markdown
-# Hello World
-## Sub section
-```
-```html
-<h1 id="hello-world"><a href="#hello-world" class="anchor-link">🔗</a>Hello World</h1>
-<h2 id="sub-section"><a href="#sub-section" class="anchor-link">🔗</a>Sub section</h2>
-```
 Build a table of contents from the generated anchors:
 ```nim
 for item in md.getSelectorItems():   # seq[(level, anchor, title)]
@@ -127,78 +120,22 @@ for item in md.getSelectorItems():   # seq[(level, anchor, title)]
 ```
 
 ### Inline formatting
-```markdown
-**bold**, *italic*, __strong__, _italic_, ~~strikethrough~~ and `code`.
-```
-```html
-<p><strong>bold</strong>, <em>italic</em>, <strong>strong</strong>, <em>italic</em>,
-<del>strikethrough</del> and <code>code</code>.</p>
-```
+Supports **bold**, *italic*, `code`, ~~strikethrough~~ and combinations.
 
 ### Links & autolinks
-```markdown
-[inline link](https://example.com "title")
-
-Bare https://example.com auto-links.
-<user@example.com>    <!-- enable enableEmailAutolinks -->
-```
-```html
-<p><a href="https://example.com" title="title">inline link</a></p>
-<p>Bare <a href="https://example.com">https://example.com</a> auto-links.</p>
-<p><a href="mailto:user@example.com">user@example.com</a></p>
-```
+Inline links with optional titles, bare `https://` auto-links and `mailto:` email autolinks via `enableEmailAutolinks`.
 
 ### Images
-```markdown
-![Marvdown logo](https://example.com/logo.png "Logo")
-```
-```html
-<img src="https://example.com/logo.png" alt="Marvdown logo" title="Logo" />
-```
+Images with alt text and optional titles.
 
 ### Lists & task lists
-```markdown
-- unordered item
-1. ordered one
-- [x] completed task
-- [ ] pending task
-```
-```html
-<ul><li>unordered item</li></ul>
-<ol><li>ordered one</li></ol>
-<ul>
-  <li><input type="checkbox" checked disabled>completed task</li>
-  <li><input type="checkbox" disabled>pending task</li>
-</ul>
-```
+Unordered (`-`, `*`, `+`), ordered (`1.`) and task lists (`- [x]`, `- [ ]`) with nesting.
 
 ### Blockquotes & alerts
-```markdown
-> A wise quote with `code`.
-
-> [!WARNING]
-> Watch out!
-```
-```html
-<blockquote>A wise quote with <code>code</code>.</blockquote>
-<div class="alert alert-warning rounded-4" role="alert">
-  <div class="alert-content">Watch out!</div>
-</div>
-```
-Supported markers: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`.
+Blockquotes and GitHub-style alerts. Supported markers: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`.
 
 ### Code blocks
-````markdown
-```nim
-proc hello =
-  echo "hi"
-```
-````
-```html
-<pre><code class="language-nim">proc hello =
-  echo &quot;hi&quot;</code></pre>
-```
-Indented code blocks (4 spaces) are supported too.
+Fenced code blocks with language info and indented code blocks (4 spaces).
 
 ### Tables (with optional footer)
 ```markdown
@@ -219,34 +156,12 @@ Indented code blocks (4 spaces) are supported too.
 Add CSS classes with `htmlTableClasses: some(@["table", "table-striped"])`.
 
 ### Footnotes
-```markdown
-This needs a citation[^1].
-
-[^1]: The footnote body.
-```
-```html
-<p>This needs a citation<sup class="footnote-ref"><a href="#fn-1">1</a></sup>.</p>
-<hr><div class="footnotes"><div class="footnote" id="fn-1"><sup>1</sup> The footnote body.</div></div>
-```
+Footnote references and definitions rendered at the end of the document.
 
 ### Reference links
-```markdown
-See the [project][repo].
-
-[repo]: https://github.com/openpeeps/marvdown
-```
-```html
-<p>See the <a href="https://github.com/openpeeps/marvdown">project</a>.</p>
-```
 Supports explicit `[text][ref]`, collapsed `[text][]` and shortcut `[text]` references.
 
 ### Raw HTML
-```markdown
-<div class="hero"><p>custom block</p></div>
-```
-```html
-<div class="hero"><p>custom block</p></div>
-```
 Raw HTML is gated by the `allowed` / `allowTagsByType` options.
 
 ### Components (`@include`, `@attr`, `$variable`)
@@ -293,14 +208,6 @@ MarkdownOptions(lazyloadImages: true)
 `<iframe src="…">`, `<video src>`, `<audio src>`, `<source src>` and `<img src>` (both raw HTML and `![alt](url)`) are rewritten from `src` to `data-src`, ready for an IntersectionObserver.
 
 ### YAML front matter
-```markdown
----
-title: Marvdown
-author: OpenPeeps
----
-
-# Body
-```
 ```nim
 let header = md.getHeader()          # YAMLObject (OrderedTable)
 echo yamlmod.getStr(header["title"]) # "Marvdown"
@@ -331,7 +238,7 @@ nim c src/marvdown.nim
 ```
 
 ## Benchmarks
-Marvdown is super fast! Run `nim c -d:release -r tests/test_benchmark.nim` (options `allowTagsByType: tagAll`, `parseYaml: false`):
+Marvdown is super fast! Run `clue test -d:release` (options `allowTagsByType: tagAll`, `parseYaml: false`):
 
 ```
 Marvdown Benchmark – toHtml (wall time, release)
@@ -339,14 +246,14 @@ Marvdown Benchmark – toHtml (wall time, release)
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample.md (CommonMark)   | 27.1 KB    |     500 |     235.60 |      0.471 |       56.23 MB/s |    27.9 KB |     235.17 |
-| tests/data/big.md        | 4.84 MB    |       5 |     793.93 |    158.786 |       30.47 MB/s |    6.15 MB |     790.63 |
-| synthetic 100 lines      | 4.2 KB     |     200 |      35.65 |      0.178 |       23.23 MB/s |     6.8 KB |      35.59 |
-| synthetic 1k lines       | 43.8 KB    |      50 |      91.66 |      1.833 |       23.31 MB/s |    68.9 KB |      90.98 |
-| synthetic 10k lines      | 451.2 KB   |       5 |     116.73 |     23.346 |       18.87 MB/s |   703.1 KB |     116.29 |
-| tiny 1 line              | 14 B       |    1000 |       1.88 |      0.002 |        7.10 MB/s |       26 B |       1.88 |
+| sample.md (CommonMark)   | 27.1 KB    |     500 |     263.99 |      0.528 |       50.19 MB/s |    27.9 KB |     263.89 |
+| tests/data/big.md        | 4.84 MB    |       5 |     842.18 |    168.437 |       28.73 MB/s |    6.15 MB |     841.88 |
+| synthetic 100 lines      | 4.2 KB     |     200 |      37.02 |      0.185 |       22.37 MB/s |     6.8 KB |      37.02 |
+| synthetic 1k lines       | 43.8 KB    |      50 |      92.59 |      1.852 |       23.07 MB/s |    68.9 KB |      92.54 |
+| synthetic 10k lines      | 451.2 KB   |       5 |     115.05 |     23.010 |       19.15 MB/s |   703.1 KB |     115.04 |
+| tiny 1 line              | 14 B       |    1000 |       2.10 |      0.002 |        6.36 MB/s |       26 B |       2.10 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 1760  |  Total wall: 1275.46 ms
+  Iterations: 1760  |  Total wall: 1352.93 ms
 ```
 
 ```
@@ -355,10 +262,10 @@ Marvdown Benchmark – toHtml + anchors
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample.md (CommonMark) + | 27.1 KB    |     250 |     121.66 |      0.487 |       54.45 MB/s |    28.0 KB |     121.27 |
-| synthetic 1k lines +anch | 43.8 KB    |      25 |      47.63 |      1.905 |       22.42 MB/s |    75.6 KB |      47.52 |
+| sample.md (CommonMark) + | 27.1 KB    |     250 |     127.20 |      0.509 |       52.08 MB/s |    28.0 KB |     127.19 |
+| synthetic 1k lines +anch | 43.8 KB    |      25 |      49.20 |      1.968 |       21.71 MB/s |    75.6 KB |      49.20 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 275  |  Total wall: 169.29 ms
+  Iterations: 275  |  Total wall: 176.40 ms
 ```
 
 ```
@@ -367,10 +274,10 @@ Marvdown Benchmark – toHtml vs toJson (sample.md)
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample toHtml            | 27.1 KB    |     100 |      49.15 |      0.491 |       53.91 MB/s |    27.9 KB |      49.01 |
-| sample toJson            | 27.1 KB    |     100 |      66.33 |      0.663 |       39.95 MB/s |    42.6 KB |      66.10 |
+| sample toHtml            | 27.1 KB    |     100 |      53.82 |      0.538 |       49.24 MB/s |    27.9 KB |      53.80 |
+| sample toJson            | 27.1 KB    |     100 |      71.98 |      0.720 |       36.81 MB/s |    42.6 KB |      71.97 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 200  |  Total wall: 115.47 ms
+  Iterations: 200  |  Total wall: 125.79 ms
 ```
 
 ```
@@ -379,13 +286,13 @@ Scaling check – 100 vs 1k lines
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| 100 lines                | 4.2 KB     |     100 |      18.70 |      0.187 |       22.15 MB/s |     6.8 KB |      18.50 |
-| 1k lines                 | 43.8 KB    |      20 |      36.27 |      1.814 |       23.56 MB/s |    68.9 KB |      36.12 |
+| 100 lines                | 4.2 KB     |     100 |      18.34 |      0.183 |       22.58 MB/s |     6.8 KB |      18.34 |
+| 1k lines                 | 43.8 KB    |      20 |      37.15 |      1.857 |       23.00 MB/s |    68.9 KB |      37.15 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 120  |  Total wall: 54.97 ms
+  Iterations: 120  |  Total wall: 55.49 ms
 ```
 
-_Benchmark via `tests/test_benchmark.nim` plain-text table; `Nim 2.2.10`, `macOS amd64`. Re-run with `nim c -d:release -r tests/test_benchmark.nim`._
+_Benchmark via `tests/test_benchmark.nim` plain-text table; `Nim 2.2.0`, `macOS amd64` (clue). Re-run with `clue test -d:release`._
 
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/marvdown/issues)
