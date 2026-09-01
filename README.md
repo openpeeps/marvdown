@@ -246,14 +246,14 @@ Marvdown Benchmark – toHtml (wall time, release)
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample.md (CommonMark)   | 27.1 KB    |     500 |     263.99 |      0.528 |       50.19 MB/s |    27.9 KB |     263.89 |
-| tests/data/big.md        | 4.84 MB    |       5 |     842.18 |    168.437 |       28.73 MB/s |    6.15 MB |     841.88 |
-| synthetic 100 lines      | 4.2 KB     |     200 |      37.02 |      0.185 |       22.37 MB/s |     6.8 KB |      37.02 |
-| synthetic 1k lines       | 43.8 KB    |      50 |      92.59 |      1.852 |       23.07 MB/s |    68.9 KB |      92.54 |
-| synthetic 10k lines      | 451.2 KB   |       5 |     115.05 |     23.010 |       19.15 MB/s |   703.1 KB |     115.04 |
-| tiny 1 line              | 14 B       |    1000 |       2.10 |      0.002 |        6.36 MB/s |       26 B |       2.10 |
+| sample.md (CommonMark)   | 27.1 KB    |     500 |     269.20 |      0.538 |       49.22 MB/s |    27.9 KB |     269.04 |
+| tests/data/big.md        | 4.84 MB    |       5 |     841.29 |    168.257 |       28.76 MB/s |    6.15 MB |     840.78 |
+| synthetic 100 lines      | 4.2 KB     |     200 |      36.75 |      0.184 |       22.54 MB/s |     6.8 KB |      36.75 |
+| synthetic 1k lines       | 43.8 KB    |      50 |      92.55 |      1.851 |       23.08 MB/s |    68.9 KB |      92.52 |
+| synthetic 10k lines      | 451.2 KB   |       5 |     116.21 |     23.242 |       18.96 MB/s |   703.1 KB |     116.20 |
+| tiny 1 line              | 14 B       |    1000 |       1.99 |      0.002 |        6.72 MB/s |       26 B |       1.99 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 1760  |  Total wall: 1352.93 ms
+  Iterations: 1760  |  Total wall: 1357.98 ms
 ```
 
 ```
@@ -262,10 +262,10 @@ Marvdown Benchmark – toHtml + anchors
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample.md (CommonMark) + | 27.1 KB    |     250 |     127.20 |      0.509 |       52.08 MB/s |    28.0 KB |     127.19 |
-| synthetic 1k lines +anch | 43.8 KB    |      25 |      49.20 |      1.968 |       21.71 MB/s |    75.6 KB |      49.20 |
+| sample.md (CommonMark) + | 27.1 KB    |     250 |     133.27 |      0.533 |       49.71 MB/s |    28.0 KB |     133.27 |
+| synthetic 1k lines +anch | 43.8 KB    |      25 |      48.78 |      1.951 |       21.90 MB/s |    75.6 KB |      48.79 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 275  |  Total wall: 176.40 ms
+  Iterations: 275  |  Total wall: 182.05 ms
 ```
 
 ```
@@ -274,10 +274,10 @@ Marvdown Benchmark – toHtml vs toJson (sample.md)
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| sample toHtml            | 27.1 KB    |     100 |      53.82 |      0.538 |       49.24 MB/s |    27.9 KB |      53.80 |
-| sample toJson            | 27.1 KB    |     100 |      71.98 |      0.720 |       36.81 MB/s |    42.6 KB |      71.97 |
+| sample toHtml            | 27.1 KB    |     100 |      52.58 |      0.526 |       50.40 MB/s |    27.9 KB |      52.58 |
+| sample toJson            | 27.1 KB    |     100 |      72.27 |      0.723 |       36.66 MB/s |    42.6 KB |      72.27 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 200  |  Total wall: 125.79 ms
+  Iterations: 200  |  Total wall: 124.85 ms
 ```
 
 ```
@@ -286,10 +286,10 @@ Scaling check – 100 vs 1k lines
 
 | Document                 | Size       |   Iters |   Total ms |     Avg ms |       Throughput |        Out |     CPU ms |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-| 100 lines                | 4.2 KB     |     100 |      18.34 |      0.183 |       22.58 MB/s |     6.8 KB |      18.34 |
-| 1k lines                 | 43.8 KB    |      20 |      37.15 |      1.857 |       23.00 MB/s |    68.9 KB |      37.15 |
+| 100 lines                | 4.2 KB     |     100 |      18.40 |      0.184 |       22.50 MB/s |     6.8 KB |      18.40 |
+| 1k lines                 | 43.8 KB    |      20 |      36.95 |      1.848 |       23.13 MB/s |    68.9 KB |      36.95 |
 |--------------------------|------------|---------|------------|------------|------------------|------------|------------|
-  Iterations: 120  |  Total wall: 55.49 ms
+  Iterations: 120  |  Total wall: 55.35 ms
 ```
 
 _Benchmark via `tests/test_benchmark.nim` plain-text table; `Nim 2.2.0`, `macOS amd64` (clue). Re-run with `clue test -d:release`._
