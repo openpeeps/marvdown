@@ -11,6 +11,6 @@ jobs:
     with:
       nim-version: stable
       app-name: marvdown
-      build-command: |
+      pre-build-command: |
         nimble install kapsis
         nim c -d:release --out:bin/marvdown src/marvdown.nim
