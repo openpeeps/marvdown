@@ -29,5 +29,5 @@ nim	mtkEOF	marvdown/lexer.html#mtkEOF	MarkdownTokenKind.mtkEOF		10
 nim	MarkdownTokenKind	marvdown/lexer.html#MarkdownTokenKind	enum MarkdownTokenKind		10
 nim	MarkdownTokenTuple	marvdown/lexer.html#MarkdownTokenTuple	tuple MarkdownTokenTuple		39
 nim	MarkdownLexer	marvdown/lexer.html#MarkdownLexer	object MarkdownLexer		48
-nim	initLexer	marvdown/lexer.html#initLexer,sinkstring,bool	proc initLexer(input: sink string; enableEmailAutolinks: bool = false): MarkdownLexer		59
-nim	nextToken	marvdown/lexer.html#nextToken,MarkdownLexer	proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple		288
+nim	initLexer	marvdown/lexer.html#initLexer,sinkstring,bool	proc initLexer(input: sink string; enableEmailAutolinks: bool = false): MarkdownLexer		60
+nim	nextToken	marvdown/lexer.html#nextToken,MarkdownLexer	proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple		291
