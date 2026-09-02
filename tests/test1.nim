@@ -1038,6 +1038,63 @@ suite "elements_lists":
     assert md.toHtml() ==
       "<ul><li><del><code>code</code> and <strong>bold</strong></del></li></ul>"
 
+suite "nested_lists_with_links":
+  test "unordered 3 levels with links (user example)":
+    let sample = "- [link name](https://example.com)\n  - [link name](https://example.com)\n    - [link name](https://example.com) "
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><a href=\"https://example.com\">link name</a><ul><li><a href=\"https://example.com\">link name</a><ul><li><a href=\"https://example.com\">link name</a></li></ul></li></ul></li></ul>"
+
+  test "unordered 3 levels plain":
+    let sample = "- one\n  - two\n    - three"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one<ul><li>two<ul><li>three</li></ul></li></ul></li></ul>"
+
+  test "ordered 3 levels with links":
+    let sample = "1. [a](https://a.com)\n   1. [b](https://b.com)\n      1. [c](https://c.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ol><li><a href=\"https://a.com\">a</a><ol><li><a href=\"https://b.com\">b</a><ol><li><a href=\"https://c.com\">c</a></li></ol></li></ol></li></ol>"
+
+  test "mixed unordered -> ordered -> unordered with links":
+    let sample = "- [a](https://a.com)\n  1. [b](https://b.com)\n     - [c](https://c.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><a href=\"https://a.com\">a</a><ol><li><a href=\"https://b.com\">b</a><ul><li><a href=\"https://c.com\">c</a></li></ul></li></ol></li></ul>"
+
+  test "mixed ordered -> unordered -> ordered":
+    let sample = "1. one\n   - two\n      1. three"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol><li>one<ul><li>two<ol><li>three</li></ol></li></ul></li></ol>"
+
+  test "unordered -> ordered 2 levels":
+    let sample = "- one\n  1. two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ul><li>one<ol><li>two</li></ol></li></ul>"
+
+  test "ordered -> unordered 2 levels":
+    let sample = "1. one\n   - two"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<ol><li>one<ul><li>two</li></ul></li></ol>"
+
+  test "nested list with star marker and links":
+    let sample = "* [a](https://a.com)\n  * [b](https://b.com)\n    * [c](https://c.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><a href=\"https://a.com\">a</a><ul><li><a href=\"https://b.com\">b</a><ul><li><a href=\"https://c.com\">c</a></li></ul></li></ul></li></ul>"
+
+  test "nested list with plus marker and links":
+    let sample = "+ [a](https://a.com)\n  + [b](https://b.com)\n    + [c](https://c.com)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li><a href=\"https://a.com\">a</a><ul><li><a href=\"https://b.com\">b</a><ul><li><a href=\"https://c.com\">c</a></li></ul></li></ul></li></ul>"
+
+  test "deep unordered 4 levels":
+    let sample = "- a\n  - b\n    - c\n      - d"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() ==
+      "<ul><li>a<ul><li>b<ul><li>c<ul><li>d</li></ul></li></ul></li></ul></li></ul>"
+
 suite "elements_blockquote":
   test "single line blockquote":
     let sample = "> A wise quote."

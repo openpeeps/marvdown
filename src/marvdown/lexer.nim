@@ -331,9 +331,37 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     while tp < lex.input.len and lex.input[tp] == ' ':
       inc sc; inc tp
     if sc >= 4:
-      return lex.parseIndentedCodeBlock()
+      # Don't treat as code if the indented line is actually a (nested) list marker:
+      # "    - item", "    * item", "    + item", "      1. item" should be lists,
+      # not indented code. Check ahead for list marker before returning code block.
+      var isList = false
+      if tp < lex.input.len:
+        if lex.input[tp] in {'-', '+', '*'} and tp + 1 < lex.input.len and lex.input[tp + 1] in {' ', '\t'}:
+          isList = true
+        elif lex.input[tp] in {'0'..'9'}:
+          var j = tp
+          while j < lex.input.len and lex.input[j] in {'0'..'9'}: inc j
+          if j < lex.input.len and lex.input[j] == '.' and j + 1 < lex.input.len and lex.input[j + 1] in {' ', '\t'}:
+            isList = true
+          # also handle checkbox "- [ ]" already covered by the '-' check above;
+          # ordered checkbox not needed
+      if not isList:
+        return lex.parseIndentedCodeBlock()
   elif lex.current == '\t' and atLineStart:
-    return lex.parseIndentedCodeBlock()
+    # tab-indented code: also check for list after tab? Tabs are rare for nested lists;
+    # treat tab + list marker as list, not code, to allow nested lists with tab indent
+    var isList = false
+    if lex.pos + 1 < lex.input.len:
+      let nxt = lex.input[lex.pos + 1]
+      if nxt in {'-', '+', '*'} and lex.pos + 2 < lex.input.len and lex.input[lex.pos + 2] in {' ', '\t'}:
+        isList = true
+      elif nxt in {'0'..'9'}:
+        var j = lex.pos + 1
+        while j < lex.input.len and lex.input[j] in {'0'..'9'}: inc j
+        if j < lex.input.len and lex.input[j] == '.' and j + 1 < lex.input.len and lex.input[j + 1] in {' ', '\t'}:
+          isList = true
+    if not isList:
+      return lex.parseIndentedCodeBlock()
 
   case lex.current
   of '#':
@@ -735,8 +763,8 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         while lex.current in {' ', '\t', '\n', '\r'}:
           lex.advance()
         return newTokenTuple(lex, mtkHorizontalRule, repeat('*', starCount))
-    if indentCol == 0 and (lex.peek() == ' ' or lex.peek() == '\t'):
-      # List item (e.g., "* item") only at start of line
+    if atLineStart(lex) and (lex.peek() == ' ' or lex.peek() == '\t'):
+      # List item (e.g., "* item") at start of line (including nested with indent)
       lex.advance()
       skipWhitespace(lex)
       lex.strbuf.setLen(0)
