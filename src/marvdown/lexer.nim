@@ -122,9 +122,12 @@ proc parseIndentedCodeBlock(lex: var MarkdownLexer): MarkdownTokenTuple =
     if peekPos < lex.input.len and lex.input[peekPos] == '\t':
       isTab = true
     if peekPos < lex.input.len and lex.input[peekPos] in {'\n', '\r', '\0'}:
-      # Blank line within code block
+      # Blank line within code block (may be "    " with indent)
       if lex.strbuf.len > 0:
         lex.strbuf.add('\n')
+      # Consume the indent spaces/tabs and the newline(s) of the blank line
+      while lex.current in {' ', '\t'}:
+        lex.advance()
       while lex.current in {'\n', '\r'}:
         if lex.current == '\r' and lex.peek() == '\n':
           lex.advance()
@@ -191,6 +194,26 @@ proc isListMarkerAt(lex: MarkdownLexer, pos: int): bool =
   else:
     result = false
 
+proc isThematicBreakAt(lex: MarkdownLexer, pos: int): bool =
+  ## True when line at `pos` is a thematic break (`***`, `---`, `___` with optional spaces).
+  var p = pos
+  while p < lex.input.len and lex.input[p] in {' ', '\t'}:
+    inc p
+  if p >= lex.input.len: return false
+  let ch = lex.input[p]
+  if ch notin {'*', '-', '_'}: return false
+  var count = 0
+  var j = p
+  while j < lex.input.len and lex.input[j] notin {'\n', '\r'}:
+    if lex.input[j] == ch:
+      inc count
+    elif lex.input[j] in {' ', '\t'}:
+      discard
+    else:
+      return false
+    inc j
+  result = count >= 3
+
 proc readListContinuation(lex: var MarkdownLexer) =
   ## Folds subsequent indented lines that are continuations of a list item
   ## into the item text stored in `strbuf` (joined with a single space).
@@ -206,6 +229,8 @@ proc readListContinuation(lex: var MarkdownLexer) =
       inc p
     if p >= lex.input.len or lex.input[p] in {'\n', '\r'}:
       break # EOF or blank line
+    if lex.isThematicBreakAt(p):
+      break # thematic break is not a list continuation
     if indent == 0 or lex.isListMarkerAt(p):
       break # not a continuation
     # consume the newline and the leading whitespace
@@ -324,29 +349,56 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     return newTokenTuple(lex, mtkEOF)
 
   # Indented code block (4 spaces or 1 tab at line start)
-  let atLineStart = newlineCount > 0 or lex.pos == 0
+  let atLineStart = newlineCount > 0 or lex.pos == 0 or (lex.pos > 0 and lex.input[lex.pos - 1] in {'\n', '\r'})
   if lex.current == ' ' and atLineStart:
     var sc = 0
     var tp = lex.pos
     while tp < lex.input.len and lex.input[tp] == ' ':
       inc sc; inc tp
-    if sc >= 4:
-      # Don't treat as code if the indented line is actually a (nested) list marker:
-      # "    - item", "    * item", "    + item", "      1. item" should be lists,
-      # not indented code. Check ahead for list marker before returning code block.
-      var isList = false
-      if tp < lex.input.len:
-        if lex.input[tp] in {'-', '+', '*'} and tp + 1 < lex.input.len and lex.input[tp + 1] in {' ', '\t'}:
-          isList = true
-        elif lex.input[tp] in {'0'..'9'}:
-          var j = tp
-          while j < lex.input.len and lex.input[j] in {'0'..'9'}: inc j
-          if j < lex.input.len and lex.input[j] == '.' and j + 1 < lex.input.len and lex.input[j + 1] in {' ', '\t'}:
-            isList = true
-          # also handle checkbox "- [ ]" already covered by the '-' check above;
-          # ordered checkbox not needed
-      if not isList:
+    var isThematic = isThematicBreakAt(lex, lex.pos)
+    if isThematic:
+      if sc >= 4:
         return lex.parseIndentedCodeBlock()
+      elif sc <= 3:
+        var hrLine = ""
+        while lex.current notin {'\n', '\r', '\0'}:
+          hrLine.add(lex.current)
+          lex.advance()
+        if lex.current in {'\n', '\r'}:
+          if lex.current == '\r' and lex.peek() == '\n': lex.advance()
+          lex.advance()
+        return newTokenTuple(lex, mtkHorizontalRule, hrLine.strip())
+    var isList = false
+    if tp < lex.input.len:
+      if lex.input[tp] in {'-', '+', '*'} and tp + 1 < lex.input.len and lex.input[tp + 1] in {' ', '\t'}:
+        # Don't treat thematic break like "* * *" as list (already handled above for sc<=3, sc>=4 is code)
+        var isListThematic = false
+        if tp < lex.input.len and lex.input[tp] in {'*','-','_'}:
+          # check if rest of line is only that char and spaces -> thematic, not list
+          var k = tp
+          var ch2 = lex.input[tp]
+          var cnt2 = 0
+          var onlyThematic = true
+          while k < lex.input.len and lex.input[k] notin {'\n','\r'}:
+            if lex.input[k] == ch2: inc cnt2
+            elif lex.input[k] in {' ', '\t'}: discard
+            else: onlyThematic = false; break
+            inc k
+          if onlyThematic and cnt2 >= 3:
+            isListThematic = true
+        if not isListThematic:
+          isList = true
+      elif lex.input[tp] in {'0'..'9'}:
+        var j = tp
+        while j < lex.input.len and lex.input[j] in {'0'..'9'}: inc j
+        if j < lex.input.len and lex.input[j] == '.' and j + 1 < lex.input.len and lex.input[j + 1] in {' ', '\t'}:
+          isList = true
+    if isList:
+      # Skip indent for nested list so it isn't emitted as text.
+      for i in 0 ..< sc:
+        lex.advance()
+    elif sc >= 4:
+      return lex.parseIndentedCodeBlock()
   elif lex.current == '\t' and atLineStart:
     # tab-indented code: also check for list after tab? Tabs are rare for nested lists;
     # treat tab + list marker as list, not code, to allow nested lists with tab indent
@@ -360,7 +412,9 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
         while j < lex.input.len and lex.input[j] in {'0'..'9'}: inc j
         if j < lex.input.len and lex.input[j] == '.' and j + 1 < lex.input.len and lex.input[j + 1] in {' ', '\t'}:
           isList = true
-    if not isList:
+    if isList:
+      lex.advance() # skip the leading tab
+    else:
       return lex.parseIndentedCodeBlock()
 
   case lex.current
@@ -380,6 +434,17 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
     else:
       return newTokenTuple(lex, mtkText, repeat('#', level))
   of '-', '_':
+    # Spaced horizontal rule like "- - -" or "_ _ _" (up to 3 indent, spaces allowed)
+    # But not for "---" at line 1 which is YAML front matter
+    if lex.line != 1 and lex.col <= 3 and isThematicBreakAt(lex, lex.pos):
+      var hrLine = ""
+      while lex.current notin {'\n', '\r', '\0'}:
+        hrLine.add(lex.current)
+        lex.advance()
+      if lex.current in {'\n', '\r'}:
+        if lex.current == '\r' and lex.peek() == '\n': lex.advance()
+        lex.advance()
+      return newTokenTuple(lex, mtkHorizontalRule, hrLine.strip())
     # Horizontal rule or unordered list or emphasis/strong
     let indentCol = lex.col
     let atLineStartMark = atLineStart(lex)
@@ -744,6 +809,16 @@ proc nextToken*(lex: var MarkdownLexer): MarkdownTokenTuple =
       return newTokenTuple(lex, mtkRefLink, attrs=some(@[text, text]))
     return newTokenTuple(lex, mtkText, "[" & text)
   of '*':
+    # Spaced horizontal rule like "* * *" (up to 3 indent)
+    if lex.col <= 3 and isThematicBreakAt(lex, lex.pos):
+      var hrLine = ""
+      while lex.current notin {'\n', '\r', '\0'}:
+        hrLine.add(lex.current)
+        lex.advance()
+      if lex.current in {'\n', '\r'}:
+        if lex.current == '\r' and lex.peek() == '\n': lex.advance()
+        lex.advance()
+      return newTokenTuple(lex, mtkHorizontalRule, hrLine.strip())
     # Could be horizontal rule, emphasis, strong, or unordered list item
     let indentCol = lex.col
     var starCount = 1
