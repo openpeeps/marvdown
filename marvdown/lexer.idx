@@ -30,4 +30,4 @@ nim	MarkdownTokenKind	marvdown/lexer.html#MarkdownTokenKind	enum MarkdownTokenKi
 nim	MarkdownTokenTuple	marvdown/lexer.html#MarkdownTokenTuple	tuple MarkdownTokenTuple		39
 nim	MarkdownLexer	marvdown/lexer.html#MarkdownLexer	object MarkdownLexer		48
 nim	initLexer	marvdown/lexer.html#initLexer,sinkstring,bool	proc initLexer(input: sink string; enableEmailAutolinks: bool = false): MarkdownLexer		60
-nim	nextToken	marvdown/lexer.html#nextToken,MarkdownLexer	proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple		291
+nim	nextToken	marvdown/lexer.html#nextToken,MarkdownLexer	proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple		316
