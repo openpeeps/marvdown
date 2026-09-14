@@ -11,7 +11,7 @@
 ## contains a `SPEC:` comment documenting the divergence for future fixes.
 
 import unittest, options, strutils, tables, os
-import marvdown
+import ../src/marvdown
 
 # ----------------------------------------------------------------------
 # Options
@@ -509,7 +509,7 @@ suite "commonmark_inlines_links":
       "<p><a href=\"https://one.com\">a</a> and <a href=\"https://two.com\">b</a></p>"
   test "link with inline formatting in text":
     check html("[**bold**](https://example.com)") ==
-      "<p><a href=\"https://example.com\">**bold**</a></p>"
+      "<p><a href=\"https://example.com\"><strong>bold</strong></a></p>"
   test "angle-bracket URL – Marvdown keeps brackets in href (gap)":
     check html("[text](<https://example.com>)") ==
       "<p><a href=\"<https://example.com>\">text</a></p>"

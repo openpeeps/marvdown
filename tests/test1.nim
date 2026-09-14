@@ -1,5 +1,5 @@
 import unittest, options, strutils, tables
-import marvdown
+import ../src/marvdown
 import pkg/openparser/yaml as yamlmod
 import std/os
 
@@ -915,6 +915,31 @@ suite "elements_links":
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() ==
       "<table><thead><tr><th>A</th></tr></thead><tbody><tr><td><a href=\"https://u.com\">x</a></td></tr></tbody></table>"
+
+  test "inline formatting inside link text":
+    let sample = "[**Clue**, a DFS package manager alternative made by OpenPeeps](https://github.com/openpeeps/clue)"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == """<p><a href="https://github.com/openpeeps/clue"><strong>Clue</strong>, a DFS package manager alternative made by OpenPeeps</a></p>"""
+
+  test "nested inline tags inside link text":
+    var md = newMarkdown("[**bold *italic* bold** and `code`](https://x.com)", noAnchors)
+    assert md.toHtml() == """<p><a href="https://x.com"><strong>bold <em>italic</em> bold</strong> and <code>code</code></a></p>"""
+    md = newMarkdown("[https://x.com](https://x.com)", noAnchors)
+    assert md.toHtml() == """<p><a href="https://x.com">https://x.com</a></p>"""
+
+  test "unclosed markers stay literal in every context":
+    var md = newMarkdown("**oops", noAnchors)
+    assert md.toHtml() == "<p>**oops</p>"
+    md = newMarkdown("# **oops", noAnchors)
+    assert md.toHtml() == "<h1>**oops</h1>"
+    md = newMarkdown("- **oops", noAnchors)
+    assert md.toHtml() == "<ul><li>**oops</li></ul>"
+    md = newMarkdown("[**oops](https://x.com)", noAnchors)
+    assert md.toHtml() == """<p><a href="https://x.com">**oops</a></p>"""
+    md = newMarkdown("> *oops", noAnchors)
+    assert md.toHtml() == "<blockquote>*oops</blockquote>"
+    md = newMarkdown("~~oops", noAnchors)
+    assert md.toHtml() == "<p>~~oops</p>"
 
 suite "elements_images":
   test "image with alt and title":

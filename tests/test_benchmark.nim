@@ -7,7 +7,7 @@
 ##   nimble test   # runs as part of suite (short iterations)
 
 import unittest, options, strutils, os, times, sequtils
-import marvdown
+import ../src/marvdown
 
 let benchOpts = MarkdownOptions(
   allowed: @[],

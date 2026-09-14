@@ -157,9 +157,15 @@ proc parseLink(md: var Markdown): MarkdownNode =
     let text = attrs[0]
     let href = attrs[1]
     let title = if attrs.len > 2: attrs[2] else: ""
-    let textNode = newText(text, md.parser.curr.line)
     result = newLink(href, title, md.parser.curr.line)
-    result.children.items.add(textNode)
+    if text == href:
+      # Autolink (or `[url](url)`): keep display text plain to avoid
+      # a nested link node from re-detecting the URL as an autolink.
+      result.children.items.add(newText(text, md.parser.curr.line))
+    else:
+      # Link text may contain inline markup (strong, emphasis, code, etc.)
+      for n in md.parseInline(text):
+        result.children.items.add(n)
 
 proc parseText(md: var Markdown): MarkdownNode =
   # Parse a text token into a MarkdownNode
@@ -411,13 +417,20 @@ proc parseInlineNode(md: var Markdown, lex: var MarkdownLexer, curr: var Markdow
       let child = parseInlineNode(md, lex, curr)
       if not child.isNil:
         emphChildren.add(child)
-    result = MarkdownNode(
-      kind: mdkEmphasis,
-      children: MarkdownNodeList(items: emphChildren),
-      line: emphLine
-    )
     if curr.kind == mtkEmphasis:
+      result = MarkdownNode(
+        kind: mdkEmphasis,
+        children: MarkdownNodeList(items: emphChildren),
+        line: emphLine
+      )
       curr = lex.nextToken()
+    else:
+      # Unclosed emphasis, treat as text (mirrors parseEmphasis)
+      result = MarkdownNode(kind: mdkText, line: emphLine)
+      result.text = "*"
+      for child in emphChildren:
+        if child.kind == mdkText:
+          result.text.add(child.text)
   of mtkStrong:
     let strongLine = curr.line
     curr = lex.nextToken()
@@ -426,13 +439,21 @@ proc parseInlineNode(md: var Markdown, lex: var MarkdownLexer, curr: var Markdow
       let child = parseInlineNode(md, lex, curr)
       if not child.isNil:
         strongChildren.add(child)
-    result = MarkdownNode(
-      kind: mdkStrong,
-      children: MarkdownNodeList(items: strongChildren),
-      line: strongLine
-    )
     if curr.kind == mtkStrong:
+      result = MarkdownNode(
+        kind: mdkStrong,
+        children: MarkdownNodeList(items: strongChildren),
+        line: strongLine
+      )
       curr = lex.nextToken()
+    else:
+      # Unclosed strong, treat as text (mirrors parseStrong)
+      strongChildren.insert(MarkdownNode(kind: mdkText, text: "**"), 0)
+      result = MarkdownNode(
+        kind: mdkText,
+        children: MarkdownNodeList(items: strongChildren),
+        line: strongLine
+      )
   of mtkStrikethrough:
     let stLine = curr.line
     curr = lex.nextToken()
@@ -441,13 +462,21 @@ proc parseInlineNode(md: var Markdown, lex: var MarkdownLexer, curr: var Markdow
       let child = parseInlineNode(md, lex, curr)
       if not child.isNil:
         stChildren.add(child)
-    result = MarkdownNode(
-      kind: mdkStrikethrough,
-      children: MarkdownNodeList(items: stChildren),
-      line: stLine
-    )
     if curr.kind == mtkStrikethrough:
+      result = MarkdownNode(
+        kind: mdkStrikethrough,
+        children: MarkdownNodeList(items: stChildren),
+        line: stLine
+      )
       curr = lex.nextToken()
+    else:
+      # Unclosed strikethrough, treat as text (mirrors parseStrikethrough)
+      stChildren.insert(MarkdownNode(kind: mdkText, text: "~~"), 0)
+      result = MarkdownNode(
+        kind: mdkText,
+        children: MarkdownNodeList(items: stChildren),
+        line: stLine
+      )
   of mtkLink:
     if curr.attrs.isSome and curr.attrs.get().len >= 2:
       let textVal = curr.attrs.get()[0]
