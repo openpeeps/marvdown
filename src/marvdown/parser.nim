@@ -85,6 +85,12 @@ type
       ## return the input unchanged to keep it. Useful for custom syntax like
       ## `@hello-world.md` that should render as rich HTML (e.g. a card) built
       ## by the consumer. Default: nil (disabled).
+    codeBlockTransform*: proc(lang, code: string): string
+      ## Optional fenced code block hook. Called at render time with the raw
+      ## fence info string (`lang`, may be "") and the raw code. Return full
+      ## inner HTML for `<pre><code>`; return "" to keep the default escaped
+      ## output. Useful for backend syntax highlighting (e.g. SweetSyntax).
+      ## Default: nil (disabled).
     lazyloadIframes*: bool
       ## Lazy-load iframes by rewriting the `src` attribute of `<iframe>`
       ## tags to `data-src` so they are only fetched when a client-side
@@ -1592,7 +1598,21 @@ proc renderNode(md: var Markdown, node: MarkdownNode): string =
         paraContent.add(md.renderNode(child))
     add result, p(paraContent)
   of mdkCodeBlock:
-    # Code block with optional language class
+    # Code block with optional language class.
+    # When `codeBlockTransform` is set, it produces the inner HTML
+    # (e.g. backend syntax highlighting); "" falls back to default.
+    if md.opts.codeBlockTransform != nil:
+      let customHtml = md.opts.codeBlockTransform(node.codeLang, node.code)
+      if customHtml.len > 0:
+        result.add(
+          pre(
+            code(
+              `class`=if node.codeLang.len > 0: "language-" & node.codeLang else: "",
+              customHtml
+            )
+          )
+        )
+        return
     let codeBlock = node.code.multiReplace(
         ("<", "&lt;"), (">", "&gt;"),
         ("\"", "&quot;"), ("&", "&amp;")
