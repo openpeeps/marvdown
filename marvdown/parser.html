@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="../dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -91,6 +91,11 @@
                                                 ## return the input unchanged to keep it. Useful for custom syntax like
                                                 ## `@hello-world.md` that should render as rich HTML (e.g. a card) built
                                                 ## by the consumer. Default: nil (disabled).
+  codeBlockTransform*: proc (lang, code: string): string ## Optional fenced code block hook. Called at render time with the raw
+                                                         ## fence info string (`lang`, may be &quot;&quot;) and the raw code. Return full
+                                                         ## inner HTML for `&lt;pre&gt;&lt;code&gt;`; return &quot;&quot; to keep the default escaped
+                                                         ## output. Useful for backend syntax highlighting (e.g. SweetSyntax).
+                                                         ## Default: nil (disabled).
   lazyloadIframes*: bool ## Lazy-load iframes by rewriting the `src` attribute of `&lt;iframe&gt;`
                          ## tags to `data-src` so they are only fetched when a client-side
                          ## script swaps them back (e.g., via IntersectionObserver).
@@ -235,6 +240,11 @@
                                                 <span class="Comment">## return the input unchanged to keep it. Useful for custom syntax like</span>
                                                 <span class="Comment">## `@hello-world.md` that should render as rich HTML (e.g. a card) built</span>
                                                 <span class="Comment">## by the consumer. Default: nil (disabled).</span>
+  <span class="Identifier">codeBlockTransform</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">lang</span><span class="Other">,</span> <span class="Identifier">code</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## Optional fenced code block hook. Called at render time with the raw</span>
+                                                         <span class="Comment">## fence info string (`lang`, may be &quot;&quot;) and the raw code. Return full</span>
+                                                         <span class="Comment">## inner HTML for `&lt;pre&gt;&lt;code&gt;`; return &quot;&quot; to keep the default escaped</span>
+                                                         <span class="Comment">## output. Useful for backend syntax highlighting (e.g. SweetSyntax).</span>
+                                                         <span class="Comment">## Default: nil (disabled).</span>
   <span class="Identifier">lazyloadIframes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Lazy-load iframes by rewriting the `src` attribute of `&lt;iframe&gt;`</span>
                          <span class="Comment">## tags to `data-src` so they are only fetched when a client-side</span>
                          <span class="Comment">## script swaps them back (e.g., via IntersectionObserver).</span>
@@ -463,7 +473,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-06 20:55:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-13 18:17:14 UTC</small>
       </div>
     </div>
   </div>
