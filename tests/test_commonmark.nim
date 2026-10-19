@@ -361,14 +361,14 @@ suite "commonmark_block_quotes":
       "<blockquote>see <a href=\"https://example.com\">here</a></blockquote>"
   test "blockquote plain not alert – unknown marker stays blockquote":
     check html("> [!FOO]\n> Not an alert.") ==
-      "<blockquote>[!FOO]Not an alert.</blockquote>"
+      "<blockquote>[!FOO] Not an alert.</blockquote>"
   test "two paragraphs in one blockquote (hard-wrapped style) – current joins":
     # Spec expects one blockquote with two paras inside; Marvdown currently concatenates
     check html("> This is a blockquote with two paragraphs. Lorem\n> consectetuer\n> \n> Donec sit").contains("<blockquote>")
-  test "nested blockquote – current concatenates, not nests (document gap)":
+  test "nested blockquote – current joins with space, not nests (document gap)":
     # SPEC: "> > nested" -> <blockquote><blockquote>nested</blockquote></blockquote>
-    # Current: <blockquote>foobar</blockquote> – we assert current.
-    check html("> foo\n> > bar") == "<blockquote>foobar</blockquote>"
+    # Current: <blockquote>foo > bar</blockquote> – we assert current.
+    check html("> foo\n> > bar") == "<blockquote>foo > bar</blockquote>"
   test "blockquote with header inside – current does not parse header (gap)":
     # SPEC: "> ## header" -> <blockquote><h2>header</h2></blockquote>
     # Current: <blockquote>foo</blockquote> where foo is stripped "#"
@@ -589,7 +589,7 @@ suite "commonmark_inlines_hard_soft_breaks":
   test "soft break single newline -> space":
     check html("line one\nline two") == "<p>line one line two</p>"
   test "hard break inside blockquote – inside inline":
-    check html("> foo  \n> bar") == "<blockquote>foobar</blockquote>"
+    check html("> foo  \n> bar") == "<blockquote>foo bar</blockquote>"
 
 suite "commonmark_inlines_textual_and_special":
   test "backslash escapes produce literal for all punct":

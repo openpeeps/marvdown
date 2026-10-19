@@ -762,13 +762,20 @@ proc parseBlockquote(md: var Markdown): MarkdownNode =
       children: MarkdownNodeList(items: @[]),
       line: md.parser.curr.line
     )
-  # Collect all consecutive blockquote lines as inline content
+  # Collect all consecutive blockquote lines as inline content.
+  # Lines are joined with a single space *before* inline parsing so that
+  # (a) words split across a soft wrap keep their boundary, and
+  # (b) inline markers spanning lines (e.g. `**bold` ... `text**`)
+  # see their opening and closing markers in one pass.
+  var parts: seq[string] = @[]
   while md.parser.curr.kind == mtkBlockquote:
     let quoteText = md.parser.curr.token.strip()
     if quoteText.len > 0:
-      for n in md.parseInline(quoteText):
-        result.children.items.add(n)
+      parts.add(quoteText)
     md.advance()
+  if parts.len > 0:
+    for n in md.parseInline(parts.join(" ")):
+      result.children.items.add(n)
 
 proc parsePipeRow(md: var Markdown): MarkdownNode =
   # Parse one pipe-delimited row. Expects curr.kind == mtkTable at row start.

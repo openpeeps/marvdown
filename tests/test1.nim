@@ -250,6 +250,14 @@ suite "alerts":
     assert html.contains("wrapped over two lines")
     assert not html.contains("[!WARNING]")
 
+  test "alert multi-line bold spanning lines and word boundaries":
+    let sample = "> [!WARNING]\n> The library is not production-ready yet and may contain bugs and security\n> vulnerabilities. It has been tested on Linux and macOS. **Use it, test it, and\n> do not hesitate to report any issues you find!**"
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert html.contains("security vulnerabilities.")
+    assert html.contains("<strong>Use it, test it, and do not hesitate to report any issues you find!</strong>")
+    assert not html.contains("**")
+
   test "plain blockquote unaffected":
     let sample = "> A wise quote."
     var md = newMarkdown(sample, noAnchors)
@@ -258,7 +266,7 @@ suite "alerts":
   test "unknown marker stays a blockquote":
     let sample = "> [!FOO]\n> Not an alert."
     var md = newMarkdown(sample, noAnchors)
-    assert md.toHtml() == "<blockquote>[!FOO]Not an alert.</blockquote>"
+    assert md.toHtml() == "<blockquote>[!FOO] Not an alert.</blockquote>"
 
 suite "extensions":
   test "yaml front matter":
@@ -1139,7 +1147,7 @@ suite "elements_blockquote":
   test "plain blockquote is not an alert":
     let sample = "> [!FOO]\n> Not an alert."
     var md = newMarkdown(sample, noAnchors)
-    assert md.toHtml() == "<blockquote>[!FOO]Not an alert.</blockquote>"
+    assert md.toHtml() == "<blockquote>[!FOO] Not an alert.</blockquote>"
 
 suite "elements_tables":
   test "basic table":
