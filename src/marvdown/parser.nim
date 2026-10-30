@@ -122,6 +122,9 @@ proc parseStrong(md: var Markdown): MarkdownNode
 proc parseStrikethrough(md: var Markdown): MarkdownNode
 proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode)
 
+proc renderHtmlWithInnerMarkdown(md: var Markdown, rawHtml: string,
+    tagName: string, line: int): string
+
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
   while i < offset and md.parser.curr.kind != mtkEOF:
@@ -1101,6 +1104,9 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
         kind: mdkHtml,
         html: block:
           var content = curr.token
+          let withInner = md.renderHtmlWithInnerMarkdown(curr.token, tag, curr.line)
+          if withInner.len > 0:
+            content = withInner
           if md.opts.lazyloadIframes:
             content = lazyloadMediaSrc(content, "iframe")
           if md.opts.lazyloadVideos:
@@ -1290,6 +1296,179 @@ proc toHtml*(md: var Markdown): string =
     add result, md.renderNode(node)
   if md.opts.showFootnotes and md.footnotesHtml.len > 0:
     add result, "<hr><div class=\"footnotes\">" & md.footnotesHtml & "</div>"
+
+proc dedentInnerMarkdown(s: string): string =
+  ## Remove HTML-nesting indentation from `s` so Markdown nested inside
+  ## HTML for readability is not misread as an indented code block.
+  ## Blank lines are normalized to empty. Only lines that are indented
+  ## participate in the common-indent calculation, and only lines with at
+  ## least that indent are stripped — paragraph continuation lines that
+  ## start at column 0 (e.g. soft-wrapped text inside a `<div>`) are left
+  ## untouched instead of being corrupted.
+  var lines = s.splitLines()
+  var minIndent = high(int)
+  for line in lines:
+    if line.strip().len == 0: continue
+    var indent = 0
+    while indent < line.len and line[indent] in {' ', '\t'}:
+      inc indent
+    if indent == 0: continue # continuation line, not HTML nesting
+    if indent < minIndent:
+      minIndent = indent
+  if minIndent == high(int) or minIndent == 0:
+    return s
+  result = newStringOfCap(s.len)
+  for idx, line in lines:
+    if line.strip().len == 0:
+      discard
+    else:
+      var indent = 0
+      while indent < line.len and line[indent] in {' ', '\t'}:
+        inc indent
+      if indent >= minIndent:
+        result.add(line[minIndent .. ^1])
+      else:
+        result.add(line)
+    if idx < lines.len - 1:
+      result.add("\n")
+
+proc innerHasBlankLine(s: string): bool =
+  ## True when `s` (after trimming outer whitespace) contains an empty
+  ## line. Used to distinguish block-level Markdown (keep `<p>` wrappers)
+  ## from single-line inline Markdown (strip the single `<p>` wrapper so
+  ## `<div>content</div>` stays `<div>content</div>`).
+  let t = s.strip()
+  if t.len == 0: return false
+  for line in t.splitLines():
+    if line.strip().len == 0:
+      return true
+  return false
+
+const innerMarkdownTags = {
+  tagDiv, tagSection, tagArticle, tagAside, tagHeader, tagFooter,
+  tagMain, tagNav, tagFigure, tagFigcaption, tagDetails, tagSummary,
+  tagBlockquote, tagP, tagSpan,
+  tagH1, tagH2, tagH3, tagH4, tagH5, tagH6
+}
+
+proc renderHtmlWithInnerMarkdown(md: var Markdown, rawHtml: string,
+    tagName: string, line: int): string =
+  ## Re-parse Markdown found inside raw HTML container tags (e.g. `<div>`).
+  ## Returns "" when the token should stay raw, otherwise the reassembled
+  ## HTML (`openTag + renderedInner + closeTag`).
+  ##
+  ## - Block Markdown (blank lines inside) keeps its `<p>` wrappers.
+  ## - Single-line inline Markdown strips the single `<p>` wrapper so
+  ##   `<div>content</div>` and `<div>**bold**</div>` don't gain extra `<p>`.
+  ## - Pure HTML (tables, lists, `pre`/`script`/`style`/`textarea`) stays raw.
+  let lowerTag = tagName.toLowerAscii()
+  let tagType = html.getHtmlTag(lowerTag)
+  if tagType notin innerMarkdownTags:
+    return ""
+  if tagType in {tagPre, tagScript, tagStyle, tagTextarea}:
+    return ""
+  if html.isSelfClosing(tagType):
+    return ""
+  # Locate `<...>` opening tag end, respecting quotes.
+  var startIdx = 0
+  while startIdx < rawHtml.len and rawHtml[startIdx] in {' ', '\t', '\n', '\r'}:
+    inc startIdx
+  if startIdx >= rawHtml.len or rawHtml[startIdx] != '<':
+    return ""
+  if startIdx + 1 < rawHtml.len and rawHtml[startIdx + 1] == '/':
+    return "" # lone closing tag like `</div>`
+  var quote: char = '\0'
+  var openEnd = -1
+  var i = startIdx + 1
+  while i < rawHtml.len:
+    let c = rawHtml[i]
+    if quote != '\0':
+      if c == quote: quote = '\0'
+    else:
+      if c in {'"', '\''}: quote = c
+      elif c == '>':
+        openEnd = i
+        break
+    inc i
+  if openEnd < 0:
+    return ""
+  # Self-closing `<div ... />` has no inner content.
+  var k = openEnd - 1
+  while k > startIdx and rawHtml[k] in {' ', '\t', '\n', '\r'}:
+    dec k
+  if k >= startIdx and rawHtml[k] == '/':
+    return ""
+  # Find outermost `</tag>` (last occurrence, case-insensitive).
+  let lowerHtml = rawHtml.toLowerAscii()
+  let closeMarker = "</" & lowerTag
+  var closeStart = lowerHtml.rfind(closeMarker)
+  if closeStart < 0 or closeStart <= openEnd:
+    return "" # no closing tag (e.g. `<div>` without `</div>`)
+  let closeEnd = rawHtml.find('>', closeStart)
+  if closeEnd < 0:
+    return ""
+  var t = closeEnd + 1
+  while t < rawHtml.len and rawHtml[t] in {' ', '\t', '\n', '\r'}:
+    inc t
+  if t != rawHtml.len:
+    return "" # trailing content after closing tag; stay raw for safety
+  let innerRaw = rawHtml[openEnd + 1 ..< closeStart]
+  if innerRaw.strip().len == 0:
+    return ""
+  let dedented = dedentInnerMarkdown(innerRaw)
+  if dedented.strip().len == 0:
+    return ""
+  var innerMd = newMarkdown(dedented, md.opts)
+  var renderedInner = innerMd.toHtml()
+  if renderedInner.strip() == dedented.strip():
+    return "" # pure HTML, no Markdown parsed — keep raw to preserve e.g. `<p>`
+  # Merge inner state (anchors, footnotes, link defs) into the outer doc.
+  for anchor, title in innerMd.selectors:
+    if not md.selectors.hasKey(anchor):
+      md.selectors[anchor] = title
+      md.selectorLevels[anchor] = innerMd.selectorLevels.getOrDefault(anchor, 2)
+  for anchor, cnt in innerMd.selectorCounter:
+    if md.selectorCounter.hasKey(anchor):
+      if cnt > md.selectorCounter[anchor]:
+        md.selectorCounter[anchor] = cnt
+    else:
+      md.selectorCounter[anchor] = cnt
+  if innerMd.footnotes != nil and innerMd.footnotes.len > 0:
+    if md.footnotes.isNil:
+      md.footnotes = newOrderedTable[string, MarkdownNode]()
+    for id, node in innerMd.footnotes:
+      if not md.footnotes.hasKey(id):
+        md.footnotes[id] = node
+  if innerMd.footnotesHtml.len > 0:
+    md.footnotesHtml.add(innerMd.footnotesHtml)
+  for lk, lv in innerMd.linkDefs:
+    if not md.linkDefs.hasKey(lk):
+      md.linkDefs[lk] = lv
+  let hasBlank = innerHasBlankLine(innerRaw)
+  if not hasBlank:
+    # No empty lines between blocks: either single-line inline Markdown
+    # (strip the single `<p>` so `<div>content</div>` stays unchanged) or
+    # a single non-paragraph block like `<pre>` / `<h1>` (keep as is).
+    # Anything mixing `<p>` with other blocks stays raw for safety.
+    if renderedInner.startsWith("<p>") and renderedInner.endsWith("</p>") and
+        renderedInner.count("<p>") == 1:
+      if not (renderedInner.contains("<ul") or renderedInner.contains("<ol") or
+              renderedInner.contains("<pre") or renderedInner.contains("<h1") or
+              renderedInner.contains("<h2") or renderedInner.contains("<h3") or
+              renderedInner.contains("<h4") or renderedInner.contains("<h5") or
+              renderedInner.contains("<h6") or renderedInner.contains("<blockquote") or
+              renderedInner.contains("<table") or renderedInner.contains("<hr") or
+              renderedInner.contains("<div")):
+        renderedInner = renderedInner[3 .. ^5]
+      else:
+        return ""
+    elif not renderedInner.contains("<p>"):
+      discard # e.g. `<pre>`, `<h1>`, `<ul>` without surrounding blank lines: keep
+    else:
+      return ""
+  let prefix = rawHtml[0 .. openEnd]
+  let suffix = rawHtml[closeStart .. ^1]
+  result = prefix & renderedInner & suffix
 
 proc toJson*(md: Markdown): string =
   ## Convert the parsed Markdown AST to JSON

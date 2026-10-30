@@ -164,6 +164,12 @@ Supports explicit `[text][ref]`, collapsed `[text][]` and shortcut `[text]` refe
 ### Raw HTML
 Raw HTML is gated by the `allowed` / `allowTagsByType` options.
 
+Markdown inside container tags (`div`, `section`, `article`, … `p`, `span`,
+`blockquote`, `h1`-`h6`) is parsed too — inline (`**bold**`, `` `code` ``,
+links) and block (headings, lists, fenced code) content works, e.g.
+`<div>\n\nHello `code`\n\n</div>` renders the `<code>` inside the `<div>`.
+Pure HTML (`pre`, `table`, `ul`/`ol`, …) stays raw.
+
 ### Components (`@include`, `@attr`, `$variable`)
 Include other files (markdown or HTML) and use props & variables in the HTML:
 
