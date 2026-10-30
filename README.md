@@ -49,6 +49,25 @@ nimble install marvdown
 
 ### From the command line
 ```
+marvdown 0.2.6 – stupid simple markdown parser
+
+MIT license | Made by Humans from OpenPeeps
+  https://github.com/openpeeps/marvdown
+
+usage: marvdown <html|json> input.md [options]
+
+commands:
+  html <input.md>         convert markdown to HTML (JSON envelope when parse_yaml is on)
+  json <input.md>         export the markdown AST as JSON
+
+options:
+  -o, --output:<file>     write to file instead of stdout (adds .html if missing)
+  -c, --config:<file>     load settings from .json/.yaml (snake_case keys)
+  --bench                 print timing stats
+  -h, --help              show this help
+  --version               show version
+```
+```
 marvdown html sample.md
 marvdown html sample.md --output out.html
 marvdown html sample.md --config options.json

@@ -113,15 +113,6 @@ elif isMainModule:
     echo "  --bench                 " & grey("print timing stats")
     echo "  -h, --help              " & grey("show this help")
     echo "  --version               " & grey("show version")
-    echo ""
-    echo grey("settings live in the config file (snake_case = camelCase opts):")
-    echo grey("allowed, allow_tags_by_type, allow_inline_style, allow_html_attributes,")
-    echo grey("enable_anchors, anchor_icon, show_footnotes, html_table_classes,")
-    echo grey("enable_email_autolinks, enable_components, component_base_dir,")
-    echo grey("lazyload_iframes, lazyload_videos, lazyload_images, parse_yaml")
-    echo ""
-    echo grey("with parse_yaml on (default), html prints {\"html\": ..., \"fields\": {...}};")
-    echo grey("set parse_yaml: false for raw HTML output")
 
   proc runHtml(inputPath, outputArg, configArg: string,
       showBench: bool): int =
