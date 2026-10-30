@@ -11,5 +11,6 @@ jobs:
     with:
       nim-version: stable
       app-name: marvdown
+      target-matrix: '[{"os":"ubuntu-latest","arch":"x86_64"},{"os":"ubuntu-24.04-arm","arch":"arm64"},{"os":"macos-14","arch":"arm64"},{"os":"macos-15-intel","arch":"x86_64"},{"os":"windows-latest","arch":"x86_64"}]'
       pre-build-command: |
         nim c -d:release --out:bin/marvdown src/marvdown.nim
