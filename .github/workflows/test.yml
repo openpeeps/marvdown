@@ -3,6 +3,3 @@ on: [push, pull_request]
 jobs:
   test:
     uses: nimbase/setup-nim-action/.github/workflows/test.yml@main
-    with:
-      pre-test-command: | # required to build the CLI
-        nimble install kapsis 

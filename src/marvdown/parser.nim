@@ -8,6 +8,7 @@ import std/[strutils, sequtils, options, tables, unicode, unidecode, os]
 import pkg/openparser/[json, yaml, html]
 
 export HtmlTag
+export json # re-exported (via openparser) so `JsonNode`, `$`, `parseJson`, … work for lib users
 
 import ./lexer, ./ast, ./components
 
@@ -921,7 +922,7 @@ const blockLevelTags = {
   HtmlTag.tagUl, HtmlTag.tagOl, HtmlTag.tagLi, HtmlTag.tagHr
 }
 
-let defaultOptions = MarkdownOptions(
+let defaultOptions* = MarkdownOptions(
   allowed: @[
     tagA, tagAbbr, tagB, tagBlockquote, tagBr,
     tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
@@ -934,6 +935,220 @@ let defaultOptions = MarkdownOptions(
   enableAnchors: true,
   enableEmailAutolinks: false
 )
+
+#
+# MarkdownOptions from JSON/YAML config (snake_case keys)
+#
+# Nim uses camelCase; config files use snake_case. The two proc fields
+# (`customTransform`, `codeBlockTransform`) are lib-only and intentionally
+# not exposed here.
+#
+
+proc tagTypeFromConfig(s: string): TagType =
+  ## Map an `allow_tags_by_type` value to `TagType` (case-insensitive,
+  ## `tag`-prefixed variants accepted: `tagBlock` == `block`)
+  let v = s.strip().toLowerAscii()
+  let normalized =
+    if v.startsWith("tag"): v[3 .. ^1]
+    else: v
+  case normalized
+  of "none": tagNone
+  of "inline": tagInline
+  of "block": tagBlock
+  of "all": tagAll
+  else:
+    raise newException(ValueError,
+      "invalid allow_tags_by_type (expected none|inline|block|all): " & s)
+
+proc htmlTagsFromConfig(names: seq[string]): seq[HtmlTag] =
+  ## Map `allowed` tag names to `HtmlTag` (case-insensitive)
+  for name in names:
+    let tag = html.getHtmlTag(name.strip().toLowerAscii())
+    if tag == tagUnknown:
+      raise newException(ValueError, "unknown html tag in allowed: " & name)
+    result.add(tag)
+
+proc optionsFromJson*(base: MarkdownOptions, node: JsonNode): MarkdownOptions =
+  ## Apply a parsed JSON config object onto `base` (snake_case keys).
+  ## Keys present in the object replace `base`; missing keys keep `base`.
+  ## Unknown keys and wrong types raise `ValueError`.
+  if node.kind != JObject:
+    raise newException(ValueError, "config root must be a JSON object")
+  result = base
+  for key, val in node.pairs:
+    case key
+    of "allowed":
+      if val.kind != JArray:
+        raise newException(ValueError, "allowed must be an array of tag names")
+      var names: seq[string] = @[]
+      for item in val.elems:
+        if item.kind != JString:
+          raise newException(ValueError, "allowed must be an array of tag names")
+        names.add(item.getStr())
+      result.allowed = htmlTagsFromConfig(names)
+    of "allow_tags_by_type":
+      if val.kind == JNull:
+        result.allowTagsByType = none(TagType)
+      elif val.kind == JString:
+        let v = val.getStr().strip().toLowerAscii()
+        if v in ["none", "null", ""]:
+          result.allowTagsByType = none(TagType)
+        else:
+          result.allowTagsByType = some(tagTypeFromConfig(val.getStr()))
+      else:
+        raise newException(ValueError, "allow_tags_by_type must be a string or null")
+    of "html_table_classes":
+      if val.kind == JNull:
+        result.htmlTableClasses = none(seq[string])
+      elif val.kind == JArray:
+        var classes: seq[string] = @[]
+        for item in val.elems:
+          if item.kind != JString:
+            raise newException(ValueError, "html_table_classes must be an array of strings or null")
+          classes.add(item.getStr())
+        result.htmlTableClasses = some(classes)
+      else:
+        raise newException(ValueError, "html_table_classes must be an array of strings or null")
+    of "anchor_icon":
+      if val.kind != JString:
+        raise newException(ValueError, "anchor_icon must be a string")
+      result.anchorIcon = val.getStr()
+    of "component_base_dir":
+      if val.kind != JString:
+        raise newException(ValueError, "component_base_dir must be a string")
+      result.componentBaseDir = val.getStr()
+    of "allow_inline_style", "allow_html_attributes", "enable_anchors",
+       "show_footnotes", "enable_email_autolinks", "enable_components",
+       "lazyload_iframes", "lazyload_videos", "lazyload_images", "parse_yaml":
+      if val.kind != JBool:
+        raise newException(ValueError, key & " must be a boolean")
+      let b = val.getBool()
+      case key
+      of "allow_inline_style": result.allowInlineStyle = b
+      of "allow_html_attributes": result.allowHtmlAttributes = b
+      of "enable_anchors": result.enableAnchors = b
+      of "show_footnotes": result.showFootnotes = b
+      of "enable_email_autolinks": result.enableEmailAutolinks = b
+      of "enable_components": result.enableComponents = b
+      of "lazyload_iframes": result.lazyloadIframes = b
+      of "lazyload_videos": result.lazyloadVideos = b
+      of "lazyload_images": result.lazyloadImages = b
+      else: result.parseYaml = b
+    else:
+      raise newException(ValueError, "unknown option (expected snake_case): " & key)
+
+proc optionsFromYaml*(base: MarkdownOptions, obj: YAMLObject): MarkdownOptions =
+  ## Apply a parsed YAML config mapping onto `base` (snake_case keys).
+  ## Same semantics as `optionsFromJson`; raises `ValueError` on misuse.
+  result = base
+  if obj.isNil: return
+  for key, val in obj.pairs:
+    case key
+    of "allowed":
+      if val.isNil or val.kind != yamlArray:
+        raise newException(ValueError, "allowed must be a list of tag names")
+      var names: seq[string] = @[]
+      for item in val.arrValue:
+        if item.isNil or item.kind != yamlString:
+          raise newException(ValueError, "allowed must be a list of tag names")
+        names.add(item.strValue)
+      result.allowed = htmlTagsFromConfig(names)
+    of "allow_tags_by_type":
+      if val.isNil or val.kind == yamlNull:
+        result.allowTagsByType = none(TagType)
+      elif val.kind == yamlString:
+        let v = val.strValue.strip().toLowerAscii()
+        if v in ["none", "null", "~", ""]:
+          result.allowTagsByType = none(TagType)
+        else:
+          result.allowTagsByType = some(tagTypeFromConfig(val.strValue))
+      else:
+        raise newException(ValueError, "allow_tags_by_type must be a string or null")
+    of "html_table_classes":
+      if val.isNil or val.kind == yamlNull:
+        result.htmlTableClasses = none(seq[string])
+      elif val.kind == yamlArray:
+        var classes: seq[string] = @[]
+        for item in val.arrValue:
+          if item.isNil or item.kind != yamlString:
+            raise newException(ValueError, "html_table_classes must be a list of strings or null")
+          classes.add(item.strValue)
+        result.htmlTableClasses = some(classes)
+      else:
+        raise newException(ValueError, "html_table_classes must be a list of strings or null")
+    of "anchor_icon":
+      if val.isNil or val.kind != yamlString:
+        raise newException(ValueError, "anchor_icon must be a string")
+      result.anchorIcon = val.strValue
+    of "component_base_dir":
+      if val.isNil or val.kind != yamlString:
+        raise newException(ValueError, "component_base_dir must be a string")
+      result.componentBaseDir = val.strValue
+    of "allow_inline_style", "allow_html_attributes", "enable_anchors",
+       "show_footnotes", "enable_email_autolinks", "enable_components",
+       "lazyload_iframes", "lazyload_videos", "lazyload_images", "parse_yaml":
+      if val.isNil or val.kind != yamlBoolean:
+        raise newException(ValueError, key & " must be a boolean")
+      let b = val.boolValue
+      case key
+      of "allow_inline_style": result.allowInlineStyle = b
+      of "allow_html_attributes": result.allowHtmlAttributes = b
+      of "enable_anchors": result.enableAnchors = b
+      of "show_footnotes": result.showFootnotes = b
+      of "enable_email_autolinks": result.enableEmailAutolinks = b
+      of "enable_components": result.enableComponents = b
+      of "lazyload_iframes": result.lazyloadIframes = b
+      of "lazyload_videos": result.lazyloadVideos = b
+      of "lazyload_images": result.lazyloadImages = b
+      else: result.parseYaml = b
+    else:
+      raise newException(ValueError, "unknown option (expected snake_case): " & key)
+
+proc loadMarkdownOptions*(path: string, base: MarkdownOptions = defaultOptions): MarkdownOptions =
+  ## Load `MarkdownOptions` from a `.json`, `.yaml` or `.yml` file (snake_case keys).
+  ## Keys present in the file replace `base`; missing keys keep `base`.
+  ## Raises `IOError` when the file is missing, `ValueError` on bad content.
+  if not fileExists(path):
+    raise newException(IOError, "config not found: " & path)
+  let ext = path.splitFile().ext.toLowerAscii()
+  let content = readFile(path)
+  case ext
+  of ".json":
+    try:
+      result = optionsFromJson(base, parseJson(content))
+    except JsonParsingError as e:
+      raise newException(ValueError, "invalid JSON config " & path & ": " & e.msg)
+  of ".yaml", ".yml":
+    result = optionsFromYaml(base, parseYAML(content))
+  else:
+    raise newException(ValueError, "unsupported config format (expected .json/.yaml/.yml): " & path)
+
+proc yamlNodeToJson*(n: YamlNode): JsonNode =
+  ## Convert a YAML node to its JSON equivalent (used for `fields`)
+  if n.isNil:
+    return newJNull()
+  case n.kind
+  of yamlNull: result = newJNull()
+  of yamlBoolean: result = newJBool(n.boolValue)
+  of yamlInteger: result = newJInt(n.intValue.int)
+  of yamlFloat: result = newJFloat(n.floatValue)
+  of yamlString: result = newJString(n.strValue)
+  of yamlArray:
+    result = newJArray()
+    for item in n.arrValue:
+      result.add(yamlNodeToJson(item))
+  of yamlObject:
+    result = newJObject()
+    if not n.objValue.isNil:
+      for k, v in n.objValue.pairs:
+        result[k] = yamlNodeToJson(v)
+
+proc headerJson*(md: Markdown): JsonNode =
+  ## Front matter as JSON (`{}` when the document has none)
+  result = newJObject()
+  if md.headerYaml.isNil: return
+  for k, v in md.headerYaml.pairs:
+    result[k] = yamlNodeToJson(v)
 
 proc lazyloadMediaSrc*(html: sink string, tagName: string): string =
   ## Rewrites the `src` attribute of `<tagName>` opening tags to `data-src`

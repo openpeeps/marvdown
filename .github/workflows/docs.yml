@@ -8,6 +8,3 @@ jobs:
     permissions:
       contents: write
     uses: nimbase/setup-nim-action/.github/workflows/docs.yml@main
-    with:
-      pre-docs-command: |
-        nimble install kapsis

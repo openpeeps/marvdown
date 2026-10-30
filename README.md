@@ -49,13 +49,43 @@ nimble install marvdown
 
 ### From the command line
 ```
-marvdown html sample.md --optAnchors
-marvdown html sample.md --optAnchors --output out.html
+marvdown html sample.md
+marvdown html sample.md --output out.html
+marvdown html sample.md --config options.json
+marvdown html sample.md --bench
 marvdown json sample.md
+marvdown json sample.md --config options.json
 ```
-- `--optAnchors` — generate heading anchors (with a 🔗 link icon)
+- `-o, --output <file>` — write to file instead of stdout (adds `.html` if missing)
+- `-c, --config <file.json|yaml|yml>` — load settings from JSON/YAML (snake_case keys, see below)
 - `--bench` — print timing stats
-- `--components` — enable `@include` / `@attr` / `$variable` components
+
+Settings (Nim `camelCase` → config `snake_case`):
+
+```json
+{
+  "allowed": ["a", "div", "span", "img", "p", "pre", "code"],
+  "allow_tags_by_type": null,
+  "allow_inline_style": false,
+  "allow_html_attributes": false,
+  "enable_anchors": true,
+  "anchor_icon": "🔗",
+  "show_footnotes": true,
+  "html_table_classes": null,
+  "enable_email_autolinks": false,
+  "enable_components": false,
+  "component_base_dir": "",
+  "lazyload_iframes": false,
+  "lazyload_videos": false,
+  "lazyload_images": false,
+  "parse_yaml": true
+}
+```
+(`customTransform` / `codeBlockTransform` are procs, so they stay lib-only.)
+
+With `parse_yaml` on (default), `html` prints a JSON envelope
+`{"html": ..., "fields": {...}}` where `fields` is the `---` front matter
+as JSON (`{}` when absent). Set `parse_yaml: false` for raw HTML output.
 
 ### As a Nim library
 ```nim
@@ -239,7 +269,7 @@ nim c -r examples/example.nim
 
 # or use the CLI on a feature-rich sample document
 nim c src/marvdown.nim
-./marvdown html examples/sample.md --optAnchors
+./marvdown html examples/sample.md
 ./marvdown json examples/sample.md
 ```
 

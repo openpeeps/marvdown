@@ -55,91 +55,258 @@ when defined(napi_build) and isMainModule:
       return %*(md.toJson())
 
 elif isMainModule:
-  # Use Marvdown as standalone CLI application
-  import std/[os, strutils, times]
-  
-  import pkg/kapsis
-  import pkg/kapsis/runtime
-  import pkg/kapsis/interactive/prompts
-
+  # Use Marvdown as standalone CLI application (stdlib only, no kapsis)
+  import std/[os, parseopt, strutils, times, json]
   import ./marvdown/parser
 
-  proc htmlCommand*(v: Values) =
-    ## Convert Markdown to HTML via CLI
-    if not v.has("md"):
-      display("Nothing to parse. Missing `.md` doc")
-      QuitFailure.quit
+  const nimbleSpec = staticRead("../marvdown.nimble")
 
+  const versionStr = block:
+    var v = "0.0.0"
+    for line in nimbleSpec.splitLines():
+      let t = line.strip()
+      if t.startsWith("version"):
+        let q1 = t.find('"')
+        let q2 = t.rfind('"')
+        if q1 >= 0 and q2 > q1:
+          v = t[q1 + 1 ..< q2]
+        break
+    v
+
+  const
+    ansiReset = "\e[0m"
+    ansiBoldWhite = "\e[1;37m"
+    ansiGrey = "\e[90m"
+    ansiRed = "\e[31m"
+
+  proc useColor(): bool =
+    getEnv("NO_COLOR") == "" and getEnv("TERM") != "dumb"
+
+  proc paint(s, code: string): string =
+    if useColor():
+      code & s & ansiReset
+    else:
+      s
+
+  proc label(s: string): string =
+    paint(s, ansiBoldWhite)
+
+  proc grey(s: string): string =
+    paint(s, ansiGrey)
+
+  proc errPrefix(): string =
+    paint("error:", ansiRed)
+
+  proc printHelp() =
+    echo grey("marvdown " & versionStr & " – stupid simple markdown parser") & "\n"
+    echo grey("MIT license | Made by Humans from OpenPeeps\n  https://github.com/openpeeps/marvdown")
+    echo ""
+    echo "usage: marvdown <html|json> input.md [options]"
+    echo ""
+    echo label("commands:")
+    echo "  html <input.md>         " & grey("convert markdown to HTML (JSON envelope when parse_yaml is on)")
+    echo "  json <input.md>         " & grey("export the markdown AST as JSON")
+    echo ""
+    echo label("options:")
+    echo "  -o, --output:<file>     " & grey("write to file instead of stdout (adds .html if missing)")
+    echo "  -c, --config:<file>     " & grey("load settings from .json/.yaml (snake_case keys)")
+    echo "  --bench                 " & grey("print timing stats")
+    echo "  -h, --help              " & grey("show this help")
+    echo "  --version               " & grey("show version")
+    echo ""
+    echo grey("settings live in the config file (snake_case = camelCase opts):")
+    echo grey("allowed, allow_tags_by_type, allow_inline_style, allow_html_attributes,")
+    echo grey("enable_anchors, anchor_icon, show_footnotes, html_table_classes,")
+    echo grey("enable_email_autolinks, enable_components, component_base_dir,")
+    echo grey("lazyload_iframes, lazyload_videos, lazyload_images, parse_yaml")
+    echo ""
+    echo grey("with parse_yaml on (default), html prints {\"html\": ..., \"fields\": {...}};")
+    echo grey("set parse_yaml: false for raw HTML output")
+
+  proc runHtml(inputPath, outputArg, configArg: string,
+      showBench: bool): int =
+    if not fileExists(inputPath):
+      echo errPrefix() & " input not found: " & inputPath
+      return 1
     let
-      filePath = absolutePath(normalizedPath($(v.get("md").getPath)))
-      hasOutputPath = v.has("output")
-      size = filePath.getFileSize
+      filePath = absolutePath(normalizedPath(inputPath))
       content = readFile(filePath)
-      showBench = v.has("--bench")
-
-      # Default Markdown options
-      markdownOptions = MarkdownOptions(
-        allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
-          tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
-          tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
-          tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
-        enableAnchors: v.has("--optAnchors"),
-        enableComponents: v.has("--components"),
-        componentBaseDir: filePath.parentDir()
-      )
       t = cpuTime() # start timer after reading file
-
+    # Base options (used when no `--config` is given)
+    var markdownOptions = MarkdownOptions(
+      allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
+        tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
+        tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
+        tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
+      enableAnchors: false,
+      enableComponents: false,
+      componentBaseDir: ""
+    )
+    if configArg.len > 0:
+      # `-c, --config:<file>`: overlay JSON/YAML settings (snake_case) onto base
+      try:
+        markdownOptions = loadMarkdownOptions(configArg, markdownOptions)
+      except CatchableError as e:
+        echo errPrefix() & " " & e.msg
+        return 1
+    if markdownOptions.componentBaseDir.len == 0:
+      # default @include resolution to the input file's directory
+      markdownOptions.componentBaseDir = filePath.parentDir()
     var md = newMarkdown(content, markdownOptions)
-
-    var outputPath =
-      if hasOutputPath:
-        absolutePath(normalizedPath($(v.get("output").getFilename)))
-      else: ""
-
-    if not outputPath.endsWith(".html"):
-      # ensure .html extension
-      outputPath = outputPath & ".html"
-
-    if not hasOutputPath:
+    let htmlStr = md.toHtml()
+    let output =
+      if markdownOptions.parseYaml:
+        # envelope with front matter as JSON (fields = {} without front matter)
+        var envelope = newJObject()
+        envelope["html"] = newJString(htmlStr)
+        envelope["fields"] = md.headerJson()
+        $envelope
+      else:
+        htmlStr
+    if outputArg.len == 0:
       # write to console if no output path is specified
-      stdout.writeLine(md.toHTML())
+      stdout.writeLine(output)
       if showBench:
         # show stats if `--bench` flag is set
         stdout.writeLine("🔥 Done in " & $(cpuTime() - t) & " sec")
     else:
+      var outputPath = absolutePath(normalizedPath(outputArg))
+      if not outputPath.endsWith(".html"):
+        # ensure .html extension
+        outputPath = outputPath & ".html"
       # end timer before writing file to
       # disk to be more accurate
       let benchTime = cpuTime() - t
-      
       # save to file
-      writeFile(outputPath, md.toHtml())
+      try:
+        writeFile(outputPath, output)
+      except OSError as e:
+        echo errPrefix() & " cannot write: " & e.msg
+        return 1
+      except IOError as e:
+        echo errPrefix() & " cannot write: " & e.msg
+        return 1
       if showBench:
         # show stats if `--bench` flag is set
         stdout.writeLine("🔥 Done in " & $benchTime & " sec")
+    return 0
 
-  proc jsonCommand(v: Values) =
-    ## Convert Markdown to JSON via CLI
-    if not v.has("md"):
-      display("Nothing to parse. Missing `.md` doc")
-      QuitFailure.quit
-
+  proc runJson(inputPath, configArg: string): int =
+    if not fileExists(inputPath):
+      echo errPrefix() & " input not found: " & inputPath
+      return 1
     let
-      filePath = absolutePath(normalizedPath($(v.get("md").getPath)))
+      filePath = absolutePath(normalizedPath(inputPath))
       content = readFile(filePath)
-
-    var md = newMarkdown(content)
-
+    var opts = defaultOptions
+    if configArg.len > 0:
+      # `-c, --config:<file>`: overlay JSON/YAML settings (snake_case) onto defaults
+      try:
+        opts = loadMarkdownOptions(configArg, opts)
+      except CatchableError as e:
+        echo errPrefix() & " " & e.msg
+        return 1
+    var md = newMarkdown(content, opts)
     # output JSON to console
     stdout.writeLine(md.toJson())
+    return 0
 
-  # Kapsis CLI Application
-  initKapsis do:
-    commands:
-      html path(md), ?filename(output),
-        ?bool("--optAnchors"),
-        ?bool("--bench"),
-        ?bool("--components"):
-          ## Write a markdown document to HTML
-      
-      json path(md):
-        ## Export the markdown AST as JSON
+  proc normalizeArgs(params: seq[string]): seq[string] =
+    ## Rewrite `--flag value` (space form) to `--flag:value` for flags that
+    ## take a value, since parseopt only attaches `:`/`=` values. A bare
+    ## `--flag` (at the end or followed by another flag) is left untouched.
+    const valueFlags = ["--output", "--out", "-o", "--config", "-c"]
+    result = @[]
+    var i = 0
+    while i < params.len:
+      let a = params[i]
+      if a in valueFlags and i + 1 < params.len and
+          not params[i + 1].startsWith("-"):
+        result.add(a & ":" & params[i + 1])
+        i += 2
+      else:
+        result.add(a)
+        inc i
+
+  proc main(): int =
+    var
+      command = ""            # subcommand: `html` or `json`
+      positionals: seq[string] = @[] # positional args after the subcommand (input.md, [output])
+      outputArg = ""          # `-o, --output:<file>`: write HTML to file instead of stdout
+      configArg = ""          # `-c, --config:<file>`: JSON/YAML settings file (snake_case keys)
+      showBench = false       # `--bench`: print conversion timing stats
+      showHelp = false        # `-h, --help`: show usage
+      showVersion = false     # `--version`: print version from .nimble
+    # shortNoVal={'h'} so `-c:cfg` / `-o:out` keep working as short options;
+    # space forms (`-c cfg`, `--output out`) are normalized above
+    var p = initOptParser(normalizeArgs(commandLineParams()), shortNoVal = {'h'})
+    for kind, key, val in p.getopt():
+      case kind
+      of cmdArgument:
+        if command == "":
+          command = key
+        else:
+          positionals.add(key)
+      of cmdLongOption, cmdShortOption:
+        let k = key.toLowerAscii()
+        case k
+        of "help", "h":
+          # `-h, --help`: show usage and exit
+          showHelp = true
+        of "version":
+          # `--version`: print version and exit
+          showVersion = true
+        of "output", "out", "o":
+          # `-o, --output:<file>` (also `--output=file`, `--output file`):
+          # destination HTML file; `.html` is appended when missing
+          outputArg = val
+        of "config", "c":
+          # `-c, --config:<file>` (also `--config=file`, `-c file`):
+          # JSON/YAML settings file with snake_case keys
+          configArg = val
+        of "bench":
+          # `--bench`: print timing stats after converting
+          showBench = true
+        else:
+          echo errPrefix() & " unknown option --" & key
+          printHelp()
+          return 1
+      of cmdEnd:
+        discard
+    if showVersion:
+      echo versionStr
+      return 0
+    if showHelp or command == "" or command == "help":
+      printHelp()
+      return 0
+    if command notin ["html", "json"]:
+      echo errPrefix() & " unknown command: " & command
+      printHelp()
+      return 1
+    if command == "html":
+      if positionals.len == 0:
+        printHelp()
+        echo "\n" & errPrefix() & " input is required"
+        return 1
+      # bare `marvdown html in.md out.html`: second positional is the output
+      var inputPath = positionals[0]
+      var outPath = outputArg
+      if outPath.len == 0 and positionals.len >= 2:
+        outPath = positionals[1]
+      if positionals.len > 2:
+        echo errPrefix() & " only one input allowed"
+        printHelp()
+        return 1
+      return runHtml(inputPath, outPath, configArg, showBench)
+    # command == "json"
+    if positionals.len == 0:
+      printHelp()
+      echo "\n" & errPrefix() & " input is required"
+      return 1
+    if positionals.len > 1:
+      echo errPrefix() & " only one input allowed"
+      printHelp()
+      return 1
+    return runJson(positionals[0], configArg)
+
+  quit(main())
