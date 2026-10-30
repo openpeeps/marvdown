@@ -148,6 +148,14 @@
   <li><a class="reference" href="#advance%2CMarkdown%2Cint" title="advance(md: var Markdown; offset = 1)">advance(md: var Markdown; offset = 1)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">configJsonString
+  <li><a class="reference" href="#configJsonString%2CMarkdownOptions" title="configJsonString(opts: MarkdownOptions): string">configJsonString(opts: MarkdownOptions): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">configYamlString
+  <li><a class="reference" href="#configYamlString%2CMarkdownOptions" title="configYamlString(opts: MarkdownOptions): string">configYamlString(opts: MarkdownOptions): string</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">decodeHtmlEntities
   <li><a class="reference" href="#decodeHtmlEntities%2Cstring" title="decodeHtmlEntities(s: string): string">decodeHtmlEntities(s: string): string</a></li>
 
@@ -210,6 +218,14 @@
 </ul>
 <ul class="simple nested-toc-section">optionsFromYaml
   <li><a class="reference" href="#optionsFromYaml%2CMarkdownOptions%2CYAMLObject" title="optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions">optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">optionsToJson
+  <li><a class="reference" href="#optionsToJson%2CMarkdownOptions" title="optionsToJson(opts: MarkdownOptions): JsonNode">optionsToJson(opts: MarkdownOptions): JsonNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">optionsToYaml
+  <li><a class="reference" href="#optionsToYaml%2CMarkdownOptions" title="optionsToYaml(opts: MarkdownOptions): YAMLObject">optionsToYaml(opts: MarkdownOptions): YAMLObject</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">toHtml
@@ -360,6 +376,30 @@
   <dd>
     
     
+    
+  </dd>
+</div>
+
+</div>
+<div id="configJsonString-procs-all">
+  <div id="configJsonString,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#configJsonString%2CMarkdownOptions"><span class="Identifier">configJsonString</span></a><span class="Other">(</span><span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Pretty-printed JSON starter config (snake_case keys)
+    
+  </dd>
+</div>
+
+</div>
+<div id="configYamlString-procs-all">
+  <div id="configYamlString,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#configYamlString%2CMarkdownOptions"><span class="Identifier">configYamlString</span></a><span class="Other">(</span><span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    YAML starter config (snake_case keys) with a short header comment
     
   </dd>
 </div>
@@ -555,6 +595,30 @@
 </div>
 
 </div>
+<div id="optionsToJson-procs-all">
+  <div id="optionsToJson,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#optionsToJson%2CMarkdownOptions"><span class="Identifier">optionsToJson</span></a><span class="Other">(</span><span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Serialize <tt class="docutils literal"><span class="pre"><span class="Identifier">opts</span></span></tt> to a JSON object with snake_case keys (inverse of <tt class="docutils literal"><span class="pre"><span class="Identifier">optionsFromJson</span></span></tt>; proc fields are skipped)
+    
+  </dd>
+</div>
+
+</div>
+<div id="optionsToYaml-procs-all">
+  <div id="optionsToYaml,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#optionsToYaml%2CMarkdownOptions"><span class="Identifier">optionsToYaml</span></a><span class="Other">(</span><span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">YAMLObject</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Serialize <tt class="docutils literal"><span class="pre"><span class="Identifier">opts</span></span></tt> to a YAML mapping with snake_case keys (inverse of <tt class="docutils literal"><span class="pre"><span class="Identifier">optionsFromYaml</span></span></tt>; proc fields are skipped)
+    
+  </dd>
+</div>
+
+</div>
 <div id="toHtml-procs-all">
   <div id="toHtml,Markdown">
   <dt><pre><span class="Keyword">proc</span> <a href="#toHtml%2CMarkdown"><span class="Identifier">toHtml</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
@@ -600,7 +664,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:46:37 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:53:59 UTC</small>
       </div>
     </div>
   </div>

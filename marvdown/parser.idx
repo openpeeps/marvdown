@@ -13,18 +13,22 @@ nim	defaultOptions	marvdown/parser.html#defaultOptions	let defaultOptions		925
 nim	optionsFromJson	marvdown/parser.html#optionsFromJson,MarkdownOptions,JsonNode	proc optionsFromJson(base: MarkdownOptions; node: JsonNode): MarkdownOptions		971
 nim	optionsFromYaml	marvdown/parser.html#optionsFromYaml,MarkdownOptions,YAMLObject	proc optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions		1040
 nim	loadMarkdownOptions	marvdown/parser.html#loadMarkdownOptions,string,MarkdownOptions	proc loadMarkdownOptions(path: string; base: MarkdownOptions = defaultOptions): MarkdownOptions		1107
-nim	yamlNodeToJson	marvdown/parser.html#yamlNodeToJson,YamlNode	proc yamlNodeToJson(n: YamlNode): JsonNode		1126
-nim	headerJson	marvdown/parser.html#headerJson,Markdown	proc headerJson(md: Markdown): JsonNode		1146
-nim	lazyloadMediaSrc	marvdown/parser.html#lazyloadMediaSrc,sinkstring,string	proc lazyloadMediaSrc(html: sink string; tagName: string): string		1153
-nim	newMarkdown	marvdown/parser.html#newMarkdown,sinkstring,MarkdownOptions	proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown		1472
-nim	toHtml	marvdown/parser.html#toHtml,Markdown	proc toHtml(md: var Markdown): string		1508
-nim	toJson	marvdown/parser.html#toJson,Markdown	proc toJson(md: Markdown): string		1688
-nim	getSelectors	marvdown/parser.html#getSelectors,Markdown	proc getSelectors(md: Markdown): OrderedTableRef[string, string]		1692
-nim	getSelectorItems	marvdown/parser.html#getSelectorItems,Markdown	proc getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]		1696
-nim	getSelectorsList	marvdown/parser.html#getSelectorsList,Markdown	proc getSelectorsList(md: Markdown): seq[string]		1703
-nim	hasSelectors	marvdown/parser.html#hasSelectors,Markdown	proc hasSelectors(md: Markdown): bool		1707
-nim	getHeader	marvdown/parser.html#getHeader,Markdown	proc getHeader(md: Markdown): YAMLObject		1711
-nim	getFootnotes	marvdown/parser.html#getFootnotes,Markdown	proc getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]		1715
-nim	hasFootnotes	marvdown/parser.html#hasFootnotes,Markdown	proc hasFootnotes(md: Markdown): bool		1719
-nim	getTitle	marvdown/parser.html#getTitle,Markdown	proc getTitle(md: Markdown): string		1723
-nim	decodeHtmlEntities	marvdown/parser.html#decodeHtmlEntities,string	proc decodeHtmlEntities(s: string): string		1733
+nim	optionsToJson	marvdown/parser.html#optionsToJson,MarkdownOptions	proc optionsToJson(opts: MarkdownOptions): JsonNode		1126
+nim	optionsToYaml	marvdown/parser.html#optionsToYaml,MarkdownOptions	proc optionsToYaml(opts: MarkdownOptions): YAMLObject		1164
+nim	configJsonString	marvdown/parser.html#configJsonString,MarkdownOptions	proc configJsonString(opts: MarkdownOptions): string		1202
+nim	configYamlString	marvdown/parser.html#configYamlString,MarkdownOptions	proc configYamlString(opts: MarkdownOptions): string		1208
+nim	yamlNodeToJson	marvdown/parser.html#yamlNodeToJson,YamlNode	proc yamlNodeToJson(n: YamlNode): JsonNode		1217
+nim	headerJson	marvdown/parser.html#headerJson,Markdown	proc headerJson(md: Markdown): JsonNode		1237
+nim	lazyloadMediaSrc	marvdown/parser.html#lazyloadMediaSrc,sinkstring,string	proc lazyloadMediaSrc(html: sink string; tagName: string): string		1244
+nim	newMarkdown	marvdown/parser.html#newMarkdown,sinkstring,MarkdownOptions	proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown		1563
+nim	toHtml	marvdown/parser.html#toHtml,Markdown	proc toHtml(md: var Markdown): string		1599
+nim	toJson	marvdown/parser.html#toJson,Markdown	proc toJson(md: Markdown): string		1779
+nim	getSelectors	marvdown/parser.html#getSelectors,Markdown	proc getSelectors(md: Markdown): OrderedTableRef[string, string]		1783
+nim	getSelectorItems	marvdown/parser.html#getSelectorItems,Markdown	proc getSelectorItems(md: Markdown): seq[tuple[level: int, anchor, title: string]]		1787
+nim	getSelectorsList	marvdown/parser.html#getSelectorsList,Markdown	proc getSelectorsList(md: Markdown): seq[string]		1794
+nim	hasSelectors	marvdown/parser.html#hasSelectors,Markdown	proc hasSelectors(md: Markdown): bool		1798
+nim	getHeader	marvdown/parser.html#getHeader,Markdown	proc getHeader(md: Markdown): YAMLObject		1802
+nim	getFootnotes	marvdown/parser.html#getFootnotes,Markdown	proc getFootnotes(md: Markdown): OrderedTableRef[string, MarkdownNode]		1806
+nim	hasFootnotes	marvdown/parser.html#hasFootnotes,Markdown	proc hasFootnotes(md: Markdown): bool		1810
+nim	getTitle	marvdown/parser.html#getTitle,Markdown	proc getTitle(md: Markdown): string		1814
+nim	decodeHtmlEntities	marvdown/parser.html#decodeHtmlEntities,string	proc decodeHtmlEntities(s: string): string		1824
