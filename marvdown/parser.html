@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.12">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.4.0">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.12"></script>
+<script type="text/javascript" src="../dochack.js?v=2.4.0"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -31,28 +31,34 @@
       <div class="row">
   <div class="three columns">
     <div class="theme-select-wrapper">
-      <label for="theme-select">Theme:&nbsp;</label>
-      <select id="theme-select" onchange="setTheme(this.value)">
-        <option value="auto">🌗 Match OS</option>
-        <option value="dark">🌑 Dark</option>
-        <option value="light">🌕 Light</option>
-      </select>
-    </div>
+  <label for="theme-select">Theme:&nbsp;</label>
+  <select id="theme-select" onchange="setTheme(this.value)">
+    <option value="auto">🌗 Match OS</option>
+    <option value="dark">🌑 Dark</option>
+    <option value="light">🌕 Light</option>
+  </select>
+</div>
+
     <div id="global-links">
-      <ul class="simple">
-        <li><a id="indexLink" href="../theindex.html">Index</a></li>
-      </ul>
-    </div>
-    <div id="searchInputDiv">
-      Search: <input type="search" id="searchInput" oninput="search()"/>
-    </div>
-    <div>
-      Group by:
-      <select onchange="groupBy(this.value)">
-        <option value="section">Section</option>
-        <option value="type">Type</option>
-      </select>
-    </div>
+  
+  <ul class="simple">
+  <li><a id="indexLink" href="../theindex.html">Index</a></li>
+</ul>
+
+</div>
+
+      <div id="searchInputDiv">
+  Search: <input type="search" id="searchInput" oninput="search()"/>
+</div>
+
+    <div class="search-groupby">
+  Group by:
+  <select onchange="groupBy(this.value)">
+    <option value="section">Section</option>
+    <option value="type">Type</option>
+  </select>
+</div>
+
     <ul class="simple simple-toc" id="toc-list">
   <li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
@@ -118,6 +124,24 @@
 </li>
 <li>
   <details open>
+    <summary><a class="reference reference-toplevel" href="#9" id="59">Lets</a></summary>
+    <ul class="simple simple-toc-section">
+      <li><a class="reference" href="#defaultOptions" title="defaultOptions = MarkdownOptions(allowed: @[tagA, tagAbbr, tagB, tagBlockquote,
+    tagBr, tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
+    tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
+    tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagMark, tagSmall, tagSub,
+    tagSup], allowTagsByType: none(TagType), allowInlineStyle: false,
+                                 allowHtmlAttributes: false,
+                                 enableAnchors: true,
+                                 enableEmailAutolinks: false,
+                                 anchorIcon: &quot;🔗&quot;, showFootnotes: true,
+                                 parseYaml: true)">defaultOptions</a></li>
+
+    </ul>
+  </details>
+</li>
+<li>
+  <details open>
     <summary><a class="reference reference-toplevel" href="#12" id="62">Procs</a></summary>
     <ul class="simple simple-toc-section">
       <ul class="simple nested-toc-section">advance
@@ -160,8 +184,16 @@
   <li><a class="reference" href="#hasSelectors%2CMarkdown" title="hasSelectors(md: Markdown): bool">hasSelectors(md: Markdown): bool</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">headerJson
+  <li><a class="reference" href="#headerJson%2CMarkdown" title="headerJson(md: Markdown): JsonNode">headerJson(md: Markdown): JsonNode</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">lazyloadMediaSrc
   <li><a class="reference" href="#lazyloadMediaSrc%2Csinkstring%2Cstring" title="lazyloadMediaSrc(html: sink string; tagName: string): string">lazyloadMediaSrc(html: sink string; tagName: string): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">loadMarkdownOptions
+  <li><a class="reference" href="#loadMarkdownOptions%2Cstring%2CMarkdownOptions" title="loadMarkdownOptions(path: string; base: MarkdownOptions = defaultOptions): MarkdownOptions">loadMarkdownOptions(path: string; base: MarkdownOptions = defaultOptions): MarkdownOptions</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newMarkdown
@@ -172,12 +204,24 @@
   <li><a class="reference" href="#newParagraph%2CMarkdownTokenTuple" title="newParagraph(curr: MarkdownTokenTuple): MarkdownNode">newParagraph(curr: MarkdownTokenTuple): MarkdownNode</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">optionsFromJson
+  <li><a class="reference" href="#optionsFromJson%2CMarkdownOptions%2CJsonNode" title="optionsFromJson(base: MarkdownOptions; node: JsonNode): MarkdownOptions">optionsFromJson(base: MarkdownOptions; node: JsonNode): MarkdownOptions</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">optionsFromYaml
+  <li><a class="reference" href="#optionsFromYaml%2CMarkdownOptions%2CYAMLObject" title="optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions">optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">toHtml
   <li><a class="reference" href="#toHtml%2CMarkdown" title="toHtml(md: var Markdown): string">toHtml(md: var Markdown): string</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">toJson
   <li><a class="reference" href="#toJson%2CMarkdown" title="toJson(md: Markdown): string">toJson(md: Markdown): string</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">yamlNodeToJson
+  <li><a class="reference" href="#yamlNodeToJson%2CYamlNode" title="yamlNodeToJson(n: YamlNode): JsonNode">yamlNodeToJson(n: YamlNode): JsonNode</a></li>
 
 </ul>
 
@@ -275,6 +319,29 @@
 <div id="TagType">
   <dt><pre><a href="#TagType"><span class="Identifier">TagType</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">tagNone</span><span class="Other">,</span> <span class="Identifier">tagInline</span><span class="Other">,</span> <span class="Identifier">tagBlock</span><span class="Other">,</span> <span class="Identifier">tagAll</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+  </dl>
+</div>
+<div class="section" id="9">
+  <h1><a class="toc-backref" href="#9">Lets</a></h1>
+  <dl class="item">
+    <div id="defaultOptions">
+  <dt><pre><a href="#defaultOptions"><span class="Identifier">defaultOptions</span></a> <span class="Other">=</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">(</span><span class="Identifier">allowed</span><span class="Other">:</span> <span class="Operator">@</span><span class="Other">[</span><span class="Identifier">tagA</span><span class="Other">,</span> <span class="Identifier">tagAbbr</span><span class="Other">,</span> <span class="Identifier">tagB</span><span class="Other">,</span> <span class="Identifier">tagBlockquote</span><span class="Other">,</span>
+    <span class="Identifier">tagBr</span><span class="Other">,</span> <span class="Identifier">tagCode</span><span class="Other">,</span> <span class="Identifier">tagDel</span><span class="Other">,</span> <span class="Identifier">tagEm</span><span class="Other">,</span> <span class="Identifier">tagH1</span><span class="Other">,</span> <span class="Identifier">tagH2</span><span class="Other">,</span> <span class="Identifier">tagH3</span><span class="Other">,</span> <span class="Identifier">tagH4</span><span class="Other">,</span> <span class="Identifier">tagH5</span><span class="Other">,</span> <span class="Identifier">tagH6</span><span class="Other">,</span>
+    <span class="Identifier">tagHr</span><span class="Other">,</span> <span class="Identifier">tagI</span><span class="Other">,</span> <span class="Identifier">tagImg</span><span class="Other">,</span> <span class="Identifier">tagLi</span><span class="Other">,</span> <span class="Identifier">tagOl</span><span class="Other">,</span> <span class="Identifier">tagP</span><span class="Other">,</span> <span class="Identifier">tagPre</span><span class="Other">,</span> <span class="Identifier">tagStrong</span><span class="Other">,</span> <span class="Identifier">tagTable</span><span class="Other">,</span>
+    <span class="Identifier">tagTbody</span><span class="Other">,</span> <span class="Identifier">tagTd</span><span class="Other">,</span> <span class="Identifier">tagTh</span><span class="Other">,</span> <span class="Identifier">tagThead</span><span class="Other">,</span> <span class="Identifier">tagTr</span><span class="Other">,</span> <span class="Identifier">tagUl</span><span class="Other">,</span> <span class="Identifier">tagMark</span><span class="Other">,</span> <span class="Identifier">tagSmall</span><span class="Other">,</span> <span class="Identifier">tagSub</span><span class="Other">,</span>
+    <span class="Identifier">tagSup</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">allowTagsByType</span><span class="Other">:</span> <span class="Identifier">none</span><span class="Other">(</span><a href="#TagType"><span class="Identifier">TagType</span></a><span class="Other">)</span><span class="Other">,</span> <span class="Identifier">allowInlineStyle</span><span class="Other">:</span> <span class="Identifier">false</span><span class="Other">,</span>
+                                 <span class="Identifier">allowHtmlAttributes</span><span class="Other">:</span> <span class="Identifier">false</span><span class="Other">,</span>
+                                 <span class="Identifier">enableAnchors</span><span class="Other">:</span> <span class="Identifier">true</span><span class="Other">,</span>
+                                 <span class="Identifier">enableEmailAutolinks</span><span class="Other">:</span> <span class="Identifier">false</span><span class="Other">,</span>
+                                 <span class="Identifier">anchorIcon</span><span class="Other">:</span> <span class="StringLit">&quot;🔗&quot;</span><span class="Other">,</span> <span class="Identifier">showFootnotes</span><span class="Other">:</span> <span class="DecNumber">true</span><span class="Other">,</span>
+                                 <span class="Identifier">parseYaml</span><span class="Other">:</span> <span class="DecNumber">true</span><span class="Other">)</span></pre></dt>
   <dd>
     
     
@@ -402,6 +469,17 @@
 </div>
 
 </div>
+<div id="headerJson-procs-all">
+  <div id="headerJson,Markdown">
+  <dt><pre><span class="Keyword">proc</span> <a href="#headerJson%2CMarkdown"><span class="Identifier">headerJson</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Front matter as JSON (<tt class="docutils literal"><span class="pre"><span class="Punctuation">{</span><span class="Punctuation">}</span></span></tt> when the document has none)
+    
+  </dd>
+</div>
+
+</div>
 <div id="lazyloadMediaSrc-procs-all">
   <div id="lazyloadMediaSrc,sinkstring,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#lazyloadMediaSrc%2Csinkstring%2Cstring"><span class="Identifier">lazyloadMediaSrc</span></a><span class="Other">(</span><span class="Identifier">html</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">tagName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
@@ -409,6 +487,20 @@
   <dd>
     
     Rewrites the <tt class="docutils literal"><span class="pre"><span class="Identifier">src</span></span></tt> attribute of <tt class="docutils literal"><span class="pre"><span class="Operator">&lt;</span><span class="Identifier">tagName</span><span class="Operator">&gt;</span></span></tt> opening tags to <tt class="docutils literal"><span class="pre"><span class="Identifier">data</span><span class="Operator">-</span><span class="Identifier">src</span></span></tt> so the media is not loaded until a client-side script swaps it back. Leaves the rest of the HTML untouched.
+    
+  </dd>
+</div>
+
+</div>
+<div id="loadMarkdownOptions-procs-all">
+  <div id="loadMarkdownOptions,string,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#loadMarkdownOptions%2Cstring%2CMarkdownOptions"><span class="Identifier">loadMarkdownOptions</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">base</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">OpenParserYamlError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span>
+    <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Load <tt class="docutils literal"><span class="pre"><span class="Identifier">MarkdownOptions</span></span></tt> from a <tt class="docutils literal"><span class="pre"><span class="Operator">.</span><span class="Identifier">json</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Operator">.</span><span class="Identifier">yaml</span></span></tt> or <tt class="docutils literal"><span class="pre"><span class="Operator">.</span><span class="Identifier">yml</span></span></tt> file (snake_case keys). Keys present in the file replace <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt>; missing keys keep <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt>. Raises <tt class="docutils literal"><span class="pre"><span class="Identifier">IOError</span></span></tt> when the file is missing, <tt class="docutils literal"><span class="pre"><span class="Identifier">ValueError</span></span></tt> on bad content.
     
   </dd>
 </div>
@@ -439,6 +531,30 @@
 </div>
 
 </div>
+<div id="optionsFromJson-procs-all">
+  <div id="optionsFromJson,MarkdownOptions,JsonNode">
+  <dt><pre><span class="Keyword">proc</span> <a href="#optionsFromJson%2CMarkdownOptions%2CJsonNode"><span class="Identifier">optionsFromJson</span></a><span class="Other">(</span><span class="Identifier">base</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">;</span> <span class="Identifier">node</span><span class="Other">:</span> <span class="Identifier">JsonNode</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Apply a parsed JSON config object onto <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt> (snake_case keys). Keys present in the object replace <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt>; missing keys keep <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt>. Unknown keys and wrong types raise <tt class="docutils literal"><span class="pre"><span class="Identifier">ValueError</span></span></tt>.
+    
+  </dd>
+</div>
+
+</div>
+<div id="optionsFromYaml-procs-all">
+  <div id="optionsFromYaml,MarkdownOptions,YAMLObject">
+  <dt><pre><span class="Keyword">proc</span> <a href="#optionsFromYaml%2CMarkdownOptions%2CYAMLObject"><span class="Identifier">optionsFromYaml</span></a><span class="Other">(</span><span class="Identifier">base</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a><span class="Other">;</span> <span class="Identifier">obj</span><span class="Other">:</span> <span class="Identifier">YAMLObject</span><span class="Other">)</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Apply a parsed YAML config mapping onto <tt class="docutils literal"><span class="pre"><span class="Identifier">base</span></span></tt> (snake_case keys). Same semantics as <tt class="docutils literal"><span class="pre"><span class="Identifier">optionsFromJson</span></span></tt>; raises <tt class="docutils literal"><span class="pre"><span class="Identifier">ValueError</span></span></tt> on misuse.
+    
+  </dd>
+</div>
+
+</div>
 <div id="toHtml-procs-all">
   <div id="toHtml,Markdown">
   <dt><pre><span class="Keyword">proc</span> <a href="#toHtml%2CMarkdown"><span class="Identifier">toHtml</span></a><span class="Other">(</span><span class="Identifier">md</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
@@ -463,6 +579,17 @@
 </div>
 
 </div>
+<div id="yamlNodeToJson-procs-all">
+  <div id="yamlNodeToJson,YamlNode">
+  <dt><pre><span class="Keyword">proc</span> <a href="#yamlNodeToJson%2CYamlNode"><span class="Identifier">yamlNodeToJson</span></a><span class="Other">(</span><span class="Identifier">n</span><span class="Other">:</span> <span class="Identifier">YamlNode</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Convert a YAML node to its JSON equivalent (used for <tt class="docutils literal"><span class="pre"><span class="Identifier">fields</span></span></tt>)
+    
+  </dd>
+</div>
+
+</div>
 
   </dl>
 </div>
@@ -473,7 +600,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-19 11:51:14 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:46:37 UTC</small>
       </div>
     </div>
   </div>

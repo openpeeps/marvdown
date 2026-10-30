@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.12">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.4.0">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.12"></script>
+<script type="text/javascript" src="dochack.js?v=2.4.0"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -44,6 +44,10 @@
 <dt><a name="decodeHtmlEntities" href="#decodeHtmlEntities"><span>decodeHtmlEntities:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc decodeHtmlEntities(s: string): string" href="marvdown/parser.html#decodeHtmlEntities%2Cstring">parser: proc decodeHtmlEntities(s: string): string</a></li>
+          </ul></dd>
+<dt><a name="defaultOptions" href="#defaultOptions"><span>defaultOptions:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: let defaultOptions" href="marvdown/parser.html#defaultOptions">parser: let defaultOptions</a></li>
           </ul></dd>
 <dt><a name="getAst" href="#getAst"><span>getAst:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -81,9 +85,9 @@
 <li><a class="reference external"
           data-doc-search-tag="parser: proc hasSelectors(md: Markdown): bool" href="marvdown/parser.html#hasSelectors%2CMarkdown">parser: proc hasSelectors(md: Markdown): bool</a></li>
           </ul></dd>
-<dt><a name="htmlCommand" href="#htmlCommand"><span>htmlCommand:</span></a></dt><dd><ul class="simple">
+<dt><a name="headerJson" href="#headerJson"><span>headerJson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="marvdown: proc htmlCommand(v: Values)" href="index.html#htmlCommand%2CValues">marvdown: proc htmlCommand(v: Values)</a></li>
+          data-doc-search-tag="parser: proc headerJson(md: Markdown): JsonNode" href="marvdown/parser.html#headerJson%2CMarkdown">parser: proc headerJson(md: Markdown): JsonNode</a></li>
           </ul></dd>
 <dt><a name="initLexer" href="#initLexer"><span>initLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -92,6 +96,10 @@
 <dt><a name="lazyloadMediaSrc" href="#lazyloadMediaSrc"><span>lazyloadMediaSrc:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc lazyloadMediaSrc(html: sink string; tagName: string): string" href="marvdown/parser.html#lazyloadMediaSrc%2Csinkstring%2Cstring">parser: proc lazyloadMediaSrc(html: sink string; tagName: string): string</a></li>
+          </ul></dd>
+<dt><a name="loadMarkdownOptions" href="#loadMarkdownOptions"><span>loadMarkdownOptions:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc loadMarkdownOptions(path: string; base: MarkdownOptions = defaultOptions): MarkdownOptions" href="marvdown/parser.html#loadMarkdownOptions%2Cstring%2CMarkdownOptions">parser: proc loadMarkdownOptions(path: string; base: MarkdownOptions = defaultOptions): MarkdownOptions</a></li>
           </ul></dd>
 <dt><a name="Markdown" href="#Markdown"><span>Markdown:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -381,6 +389,14 @@
 <li><a class="reference external"
           data-doc-search-tag="lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple" href="marvdown/lexer.html#nextToken%2CMarkdownLexer">lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple</a></li>
           </ul></dd>
+<dt><a name="optionsFromJson" href="#optionsFromJson"><span>optionsFromJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc optionsFromJson(base: MarkdownOptions; node: JsonNode): MarkdownOptions" href="marvdown/parser.html#optionsFromJson%2CMarkdownOptions%2CJsonNode">parser: proc optionsFromJson(base: MarkdownOptions; node: JsonNode): MarkdownOptions</a></li>
+          </ul></dd>
+<dt><a name="optionsFromYaml" href="#optionsFromYaml"><span>optionsFromYaml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions" href="marvdown/parser.html#optionsFromYaml%2CMarkdownOptions%2CYAMLObject">parser: proc optionsFromYaml(base: MarkdownOptions; obj: YAMLObject): MarkdownOptions</a></li>
+          </ul></dd>
 <dt><a name="preprocess" href="#preprocess"><span>preprocess:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="components: proc preprocess(content: string; basePath: string; scope: var ComponentScope;
@@ -435,11 +451,15 @@
 <li><a class="reference external"
           data-doc-search-tag="components: proc transformLines(content: string; transform: proc (line: string): string): string" href="marvdown/components.html#transformLines%2Cstring%2Cproc%28string%29">components: proc transformLines(content: string; transform: proc (line: string): string): string</a></li>
           </ul></dd>
+<dt><a name="yamlNodeToJson" href="#yamlNodeToJson"><span>yamlNodeToJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc yamlNodeToJson(n: YamlNode): JsonNode" href="marvdown/parser.html#yamlNodeToJson%2CYamlNode">parser: proc yamlNodeToJson(n: YamlNode): JsonNode</a></li>
+          </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-19 11:51:17 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:46:37 UTC</small>
       </div>
     </div>
   </div>

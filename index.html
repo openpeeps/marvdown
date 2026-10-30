@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.12">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.4.0">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.12"></script>
+<script type="text/javascript" src="dochack.js?v=2.4.0"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -31,28 +31,34 @@
       <div class="row">
   <div class="three columns">
     <div class="theme-select-wrapper">
-      <label for="theme-select">Theme:&nbsp;</label>
-      <select id="theme-select" onchange="setTheme(this.value)">
-        <option value="auto">🌗 Match OS</option>
-        <option value="dark">🌑 Dark</option>
-        <option value="light">🌕 Light</option>
-      </select>
-    </div>
+  <label for="theme-select">Theme:&nbsp;</label>
+  <select id="theme-select" onchange="setTheme(this.value)">
+    <option value="auto">🌗 Match OS</option>
+    <option value="dark">🌑 Dark</option>
+    <option value="light">🌕 Light</option>
+  </select>
+</div>
+
     <div id="global-links">
-      <ul class="simple">
-        <li><a id="indexLink" href="theindex.html">Index</a></li>
-      </ul>
-    </div>
-    <div id="searchInputDiv">
-      Search: <input type="search" id="searchInput" oninput="search()"/>
-    </div>
-    <div>
-      Group by:
-      <select onchange="groupBy(this.value)">
-        <option value="section">Section</option>
-        <option value="type">Type</option>
-      </select>
-    </div>
+  
+  <ul class="simple">
+  <li><a id="indexLink" href="theindex.html">Index</a></li>
+</ul>
+
+</div>
+
+      <div id="searchInputDiv">
+  Search: <input type="search" id="searchInput" oninput="search()"/>
+</div>
+
+    <div class="search-groupby">
+  Group by:
+  <select onchange="groupBy(this.value)">
+    <option value="section">Section</option>
+    <option value="type">Type</option>
+  </select>
+</div>
+
     <ul class="simple simple-toc" id="toc-list">
   <li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
@@ -63,10 +69,6 @@
     <ul class="simple simple-toc-section">
       <ul class="simple nested-toc-section">getAst
   <li><a class="reference" href="#getAst%2Csinkstring" title="getAst(content: sink string): string">getAst(content: sink string): string</a></li>
-
-</ul>
-<ul class="simple nested-toc-section">htmlCommand
-  <li><a class="reference" href="#htmlCommand%2CValues" title="htmlCommand(v: Values)">htmlCommand(v: Values)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">toHtml
@@ -116,19 +118,6 @@
 </div>
 
 </div>
-<div id="htmlCommand-procs-all">
-  <div id="htmlCommand,Values">
-  <dt><pre><span class="Keyword">proc</span> <a href="#htmlCommand%2CValues"><span class="Identifier">htmlCommand</span></a><span class="Other">(</span><span class="Identifier">v</span><span class="Other">:</span> <span class="Identifier">Values</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span>
-                                       <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    Convert Markdown to HTML via CLI
-    
-  </dd>
-</div>
-
-</div>
 <div id="toHtml-procs-all">
   <div id="toHtml,sinkstring">
   <dt><pre><span class="Keyword">proc</span> <a href="#toHtml%2Csinkstring"><span class="Identifier">toHtml</span></a><span class="Other">(</span><span class="Identifier">content</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">owned</span> <span class="Identifier">string</span> {.
@@ -169,7 +158,7 @@
 <div class="section" id="19">
   <h1><a class="toc-backref" href="#19">Exports</a></h1>
   <dl class="item">
-    <a href="marvdown/parser.html#decodeHtmlEntities,string"><span class="Identifier">decodeHtmlEntities</span></a>, <a href="marvdown/parser.html#lazyloadMediaSrc,sinkstring,string"><span class="Identifier">lazyloadMediaSrc</span></a>, <a href="marvdown/parser.html#getHeader,Markdown"><span class="Identifier">getHeader</span></a>, <a href="marvdown/parser.html#newParagraph,MarkdownTokenTuple"><span class="Identifier">newParagraph</span></a>, <a href="marvdown/parser.html#Markdown"><span class="Identifier">Markdown</span></a>, <a href="marvdown/parser.html#getTitle,Markdown"><span class="Identifier">getTitle</span></a>, <a href="marvdown/parser.html#getFootnotes,Markdown"><span class="Identifier">getFootnotes</span></a>, <a href="marvdown/parser.html#newMarkdown,sinkstring,MarkdownOptions"><span class="Identifier">newMarkdown</span></a>, <a href="marvdown/parser.html#getSelectorItems,Markdown"><span class="Identifier">getSelectorItems</span></a>, <a href="marvdown/parser.html#getSelectorsList,Markdown"><span class="Identifier">getSelectorsList</span></a>, <a href="marvdown/parser.html#advance,Markdown,int"><span class="Identifier">advance</span></a>, <a href="marvdown/parser.html#TagType"><span class="Identifier">TagType</span></a>, <a href="marvdown/parser.html#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a>, <a href="marvdown/parser.html#MarkdownParser"><span class="Identifier">MarkdownParser</span></a>, <a href="marvdown/parser.html#getSelectors,Markdown"><span class="Identifier">getSelectors</span></a>, <a href="marvdown/parser.html#toJson,Markdown"><span class="Identifier">toJson</span></a>, <a href="marvdown/parser.html#hasSelectors,Markdown"><span class="Identifier">hasSelectors</span></a>, <a href="marvdown/parser.html#toHtml,Markdown"><span class="Identifier">toHtml</span></a>, <a href="marvdown/parser.html#hasFootnotes,Markdown"><span class="Identifier">hasFootnotes</span></a>, <a href="marvdown/ast.html#newRawHtml,string,int"><span class="Identifier">newRawHtml</span></a>, <a href="marvdown/ast.html#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a>, <a href="marvdown/ast.html#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a>, <a href="marvdown/ast.html#newImage,string,string,string,int"><span class="Identifier">newImage</span></a>, <a href="marvdown/ast.html#newHeading,range[],int"><span class="Identifier">newHeading</span></a>, <a href="marvdown/ast.html#newText,string,int"><span class="Identifier">newText</span></a>, <a href="marvdown/ast.html#debugEcho,MarkdownNode"><span class="Identifier">debugEcho</span></a>, <a href="marvdown/ast.html#newLink,string,string,int"><span class="Identifier">newLink</span></a>, <a href="marvdown/ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a>, <a href="marvdown/components.html#newComponentScope"><span class="Identifier">newComponentScope</span></a>, <a href="marvdown/components.html#ComponentScope"><span class="Identifier">ComponentScope</span></a>, <a href="marvdown/components.html#resolveVariables,string,ComponentScope"><span class="Identifier">resolveVariables</span></a>, <a href="marvdown/components.html#preprocess,string,string,ComponentScope,seq[string]"><span class="Identifier">preprocess</span></a>, <a href="marvdown/components.html#processHtmlContent,sinkstring,ComponentScope"><span class="Identifier">processHtmlContent</span></a>, <a href="marvdown/components.html#transformLines,string,proc(string)"><span class="Identifier">transformLines</span></a>, <a href="marvdown/parser.html#hasSelectors,Markdown_2"><span class="Identifier">hasSelectors</span></a>, <a href="marvdown/parser.html#getSelectors,Markdown_2"><span class="Identifier">getSelectors</span></a>, <a href="marvdown/parser.html#getSelectorItems,Markdown_2"><span class="Identifier">getSelectorItems</span></a>, <a href="marvdown/parser.html#getTitle,Markdown_2"><span class="Identifier">getTitle</span></a>
+    <a href="marvdown/parser.html#Markdown"><span class="Identifier">Markdown</span></a>, <a href="marvdown/parser.html#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a>, <a href="marvdown/parser.html#MarkdownParser"><span class="Identifier">MarkdownParser</span></a>, <a href="marvdown/parser.html#TagType"><span class="Identifier">TagType</span></a>, <a href="marvdown/parser.html#advance,Markdown,int"><span class="Identifier">advance</span></a>, <a href="marvdown/parser.html#decodeHtmlEntities,string"><span class="Identifier">decodeHtmlEntities</span></a>, <a href="marvdown/parser.html#defaultOptions"><span class="Identifier">defaultOptions</span></a>, <a href="marvdown/parser.html#getFootnotes,Markdown"><span class="Identifier">getFootnotes</span></a>, <a href="marvdown/parser.html#getHeader,Markdown"><span class="Identifier">getHeader</span></a>, <a href="marvdown/parser.html#getSelectorItems,Markdown"><span class="Identifier">getSelectorItems</span></a>, <a href="marvdown/parser.html#getSelectors,Markdown"><span class="Identifier">getSelectors</span></a>, <a href="marvdown/parser.html#getSelectorsList,Markdown"><span class="Identifier">getSelectorsList</span></a>, <a href="marvdown/parser.html#getTitle,Markdown"><span class="Identifier">getTitle</span></a>, <a href="marvdown/parser.html#hasFootnotes,Markdown"><span class="Identifier">hasFootnotes</span></a>, <a href="marvdown/parser.html#hasSelectors,Markdown"><span class="Identifier">hasSelectors</span></a>, <a href="marvdown/parser.html#headerJson,Markdown"><span class="Identifier">headerJson</span></a>, <a href="marvdown/parser.html#lazyloadMediaSrc,sinkstring,string"><span class="Identifier">lazyloadMediaSrc</span></a>, <a href="marvdown/parser.html#loadMarkdownOptions,string,MarkdownOptions"><span class="Identifier">loadMarkdownOptions</span></a>, <a href="marvdown/parser.html#newMarkdown,sinkstring,MarkdownOptions"><span class="Identifier">newMarkdown</span></a>, <a href="marvdown/parser.html#newParagraph,MarkdownTokenTuple"><span class="Identifier">newParagraph</span></a>, <a href="marvdown/parser.html#optionsFromJson,MarkdownOptions,JsonNode"><span class="Identifier">optionsFromJson</span></a>, <a href="marvdown/parser.html#optionsFromYaml,MarkdownOptions,YAMLObject"><span class="Identifier">optionsFromYaml</span></a>, <a href="marvdown/parser.html#toHtml,Markdown"><span class="Identifier">toHtml</span></a>, <a href="marvdown/parser.html#toJson,Markdown"><span class="Identifier">toJson</span></a>, <a href="marvdown/parser.html#yamlNodeToJson,YamlNode"><span class="Identifier">yamlNodeToJson</span></a>, <a href="marvdown/ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a>, <a href="marvdown/ast.html#MarkdownNodeKind"><span class="Identifier">MarkdownNodeKind</span></a>, <a href="marvdown/ast.html#MarkdownNodeList"><span class="Identifier">MarkdownNodeList</span></a>, <a href="marvdown/ast.html#debugEcho,MarkdownNode"><span class="Identifier">debugEcho</span></a>, <a href="marvdown/ast.html#newHeading,range[],int"><span class="Identifier">newHeading</span></a>, <a href="marvdown/ast.html#newImage,string,string,string,int"><span class="Identifier">newImage</span></a>, <a href="marvdown/ast.html#newLink,string,string,int"><span class="Identifier">newLink</span></a>, <a href="marvdown/ast.html#newRawHtml,string,int"><span class="Identifier">newRawHtml</span></a>, <a href="marvdown/ast.html#newText,string,int"><span class="Identifier">newText</span></a>, <a href="marvdown/components.html#ComponentScope"><span class="Identifier">ComponentScope</span></a>, <a href="marvdown/components.html#newComponentScope"><span class="Identifier">newComponentScope</span></a>, <a href="marvdown/components.html#preprocess,string,string,ComponentScope,seq[string]"><span class="Identifier">preprocess</span></a>, <a href="marvdown/components.html#processHtmlContent,sinkstring,ComponentScope"><span class="Identifier">processHtmlContent</span></a>, <a href="marvdown/components.html#resolveVariables,string,ComponentScope"><span class="Identifier">resolveVariables</span></a>, <a href="marvdown/components.html#transformLines,string,proc(string)"><span class="Identifier">transformLines</span></a>, <a href="marvdown/parser.html#hasSelectors,Markdown_2"><span class="Identifier">hasSelectors</span></a>, <a href="marvdown/parser.html#getSelectors,Markdown_2"><span class="Identifier">getSelectors</span></a>, <a href="marvdown/parser.html#getSelectorItems,Markdown_2"><span class="Identifier">getSelectorItems</span></a>, <a href="marvdown/parser.html#getTitle,Markdown_2"><span class="Identifier">getTitle</span></a>
   </dl>
 </div>
 
@@ -179,7 +168,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-19 11:51:17 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:46:37 UTC</small>
       </div>
     </div>
   </div>
