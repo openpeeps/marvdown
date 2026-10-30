@@ -1123,6 +1123,97 @@ proc loadMarkdownOptions*(path: string, base: MarkdownOptions = defaultOptions):
   else:
     raise newException(ValueError, "unsupported config format (expected .json/.yaml/.yml): " & path)
 
+proc optionsToJson*(opts: MarkdownOptions): JsonNode =
+  ## Serialize `opts` to a JSON object with snake_case keys
+  ## (inverse of `optionsFromJson`; proc fields are skipped)
+  result = newJObject()
+  var tags = newJArray()
+  for tag in opts.allowed:
+    tags.add(newJString($tag))
+  result["allowed"] = tags
+  if opts.allowTagsByType.isSome:
+    let name =
+      case opts.allowTagsByType.get()
+      of tagNone: "none"
+      of tagInline: "inline"
+      of tagBlock: "block"
+      of tagAll: "all"
+    result["allow_tags_by_type"] = newJString(name)
+  else:
+    result["allow_tags_by_type"] = newJNull()
+  result["allow_inline_style"] = newJBool(opts.allowInlineStyle)
+  result["allow_html_attributes"] = newJBool(opts.allowHtmlAttributes)
+  result["enable_anchors"] = newJBool(opts.enableAnchors)
+  result["anchor_icon"] = newJString(opts.anchorIcon)
+  result["show_footnotes"] = newJBool(opts.showFootnotes)
+  if opts.htmlTableClasses.isSome:
+    var classes = newJArray()
+    for c in opts.htmlTableClasses.get():
+      classes.add(newJString(c))
+    result["html_table_classes"] = classes
+  else:
+    result["html_table_classes"] = newJNull()
+  result["enable_email_autolinks"] = newJBool(opts.enableEmailAutolinks)
+  result["enable_components"] = newJBool(opts.enableComponents)
+  result["component_base_dir"] = newJString(opts.componentBaseDir)
+  result["lazyload_iframes"] = newJBool(opts.lazyloadIframes)
+  result["lazyload_videos"] = newJBool(opts.lazyloadVideos)
+  result["lazyload_images"] = newJBool(opts.lazyloadImages)
+  result["parse_yaml"] = newJBool(opts.parseYaml)
+
+proc optionsToYaml*(opts: MarkdownOptions): YAMLObject =
+  ## Serialize `opts` to a YAML mapping with snake_case keys
+  ## (inverse of `optionsFromYaml`; proc fields are skipped)
+  result = newOrderedTable[string, YamlNode]()
+  var tags: seq[YamlNode] = @[]
+  for tag in opts.allowed:
+    tags.add(YamlNode(kind: yamlString, strValue: $tag))
+  result["allowed"] = YamlNode(kind: yamlArray, arrValue: tags)
+  if opts.allowTagsByType.isSome:
+    let name =
+      case opts.allowTagsByType.get()
+      of tagNone: "none"
+      of tagInline: "inline"
+      of tagBlock: "block"
+      of tagAll: "all"
+    result["allow_tags_by_type"] = YamlNode(kind: yamlString, strValue: name)
+  else:
+    result["allow_tags_by_type"] = YamlNode(kind: yamlNull)
+  result["allow_inline_style"] = YamlNode(kind: yamlBoolean, boolValue: opts.allowInlineStyle)
+  result["allow_html_attributes"] = YamlNode(kind: yamlBoolean, boolValue: opts.allowHtmlAttributes)
+  result["enable_anchors"] = YamlNode(kind: yamlBoolean, boolValue: opts.enableAnchors)
+  result["anchor_icon"] = YamlNode(kind: yamlString, strValue: opts.anchorIcon)
+  result["show_footnotes"] = YamlNode(kind: yamlBoolean, boolValue: opts.showFootnotes)
+  if opts.htmlTableClasses.isSome:
+    var classes: seq[YamlNode] = @[]
+    for c in opts.htmlTableClasses.get():
+      classes.add(YamlNode(kind: yamlString, strValue: c))
+    result["html_table_classes"] = YamlNode(kind: yamlArray, arrValue: classes)
+  else:
+    result["html_table_classes"] = YamlNode(kind: yamlNull)
+  result["enable_email_autolinks"] = YamlNode(kind: yamlBoolean, boolValue: opts.enableEmailAutolinks)
+  result["enable_components"] = YamlNode(kind: yamlBoolean, boolValue: opts.enableComponents)
+  result["component_base_dir"] = YamlNode(kind: yamlString, strValue: opts.componentBaseDir)
+  result["lazyload_iframes"] = YamlNode(kind: yamlBoolean, boolValue: opts.lazyloadIframes)
+  result["lazyload_videos"] = YamlNode(kind: yamlBoolean, boolValue: opts.lazyloadVideos)
+  result["lazyload_images"] = YamlNode(kind: yamlBoolean, boolValue: opts.lazyloadImages)
+  result["parse_yaml"] = YamlNode(kind: yamlBoolean, boolValue: opts.parseYaml)
+
+proc configJsonString*(opts: MarkdownOptions): string =
+  ## Pretty-printed JSON starter config (snake_case keys)
+  result = optionsToJson(opts).pretty()
+  if not result.endsWith("\n"):
+    result.add("\n")
+
+proc configYamlString*(opts: MarkdownOptions): string =
+  ## YAML starter config (snake_case keys) with a short header comment
+  const header = "# marvdown settings (snake_case = camelCase Nim opts)\n" &
+    "# raw HTML tags in `allowed` (empty list = no raw HTML);\n" &
+    "# `allow_tags_by_type`: none|inline|block|all (or null)\n"
+  result = header & dump(optionsToYaml(opts))
+  if not result.endsWith("\n"):
+    result.add("\n")
+
 proc yamlNodeToJson*(n: YamlNode): JsonNode =
   ## Convert a YAML node to its JSON equivalent (used for `fields`)
   if n.isNil:

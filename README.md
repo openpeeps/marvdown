@@ -59,6 +59,7 @@ usage: marvdown <html|json> input.md [options]
 commands:
   html <input.md>         convert markdown to HTML (JSON envelope when parse_yaml is on)
   json <input.md>         export the markdown AST as JSON
+  init                    write a starter .json/.yaml settings file
 
 options:
   -o, --output:<file>     write to file instead of stdout (adds .html if missing)
@@ -66,6 +67,10 @@ options:
   --bench                 print timing stats
   -h, --help              show this help
   --version               show version
+
+init options:
+  --format:<json|yaml>    starter file format (default: from output name, else json)
+  --force, -f             overwrite the starter file if it exists
 ```
 ```
 marvdown html sample.md
@@ -74,6 +79,8 @@ marvdown html sample.md --config options.json
 marvdown html sample.md --bench
 marvdown json sample.md
 marvdown json sample.md --config options.json
+marvdown init
+marvdown init --format yaml --output marvdown.yaml
 ```
 - `-o, --output <file>` — write to file instead of stdout (adds `.html` if missing)
 - `-c, --config <file.json|yaml|yml>` — load settings from JSON/YAML (snake_case keys, see below)

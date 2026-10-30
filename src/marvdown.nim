@@ -106,6 +106,7 @@ elif isMainModule:
     echo label("commands:")
     echo "  html <input.md>         " & grey("convert markdown to HTML (JSON envelope when parse_yaml is on)")
     echo "  json <input.md>         " & grey("export the markdown AST as JSON")
+    echo "  init                    " & grey("write a starter .json/.yaml settings file")
     echo ""
     echo label("options:")
     echo "  -o, --output:<file>     " & grey("write to file instead of stdout (adds .html if missing)")
@@ -113,6 +114,60 @@ elif isMainModule:
     echo "  --bench                 " & grey("print timing stats")
     echo "  -h, --help              " & grey("show this help")
     echo "  --version               " & grey("show version")
+    echo ""
+    echo label("init options:")
+    echo "  --format:<json|yaml>    " & grey("starter file format (default: from output name, else json)")
+    echo "  --force, -f             " & grey("overwrite the starter file if it exists")
+
+  proc cliBaseOptions(): MarkdownOptions =
+    ## Built-in CLI defaults (used when no `--config` is given and as the
+    ## `init` starter content, so a fresh starter matches current CLI behavior)
+    MarkdownOptions(
+      allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
+        tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
+        tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
+        tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
+      enableAnchors: false,
+      enableComponents: false,
+      componentBaseDir: ""
+    )
+
+  proc runInit(formatArg, outputArg: string, force: bool): int =
+    var fmt = formatArg.strip().toLowerAscii()
+    var outPath = outputArg
+    if fmt.len == 0:
+      # default format: from output extension, else json
+      if outPath.len > 0:
+        case outPath.splitFile().ext.toLowerAscii()
+        of ".yaml", ".yml": fmt = "yaml"
+        else: fmt = "json"
+      else:
+        fmt = "json"
+    if fmt == "yml":
+      fmt = "yaml"
+    if fmt notin ["json", "yaml"]:
+      echo errPrefix() & " invalid format (expected json|yaml): " & formatArg
+      return 1
+    if outPath.len == 0:
+      outPath = "marvdown." & fmt
+    if fileExists(outPath) and not force:
+      echo errPrefix() & " file exists (use --force to overwrite): " & outPath
+      return 1
+    # starter mirrors the built-in CLI defaults (init output = current behavior)
+    let base = cliBaseOptions()
+    let content =
+      if fmt == "yaml": configYamlString(base)
+      else: configJsonString(base)
+    try:
+      writeFile(outPath, content)
+    except OSError as e:
+      echo errPrefix() & " cannot write: " & e.msg
+      return 1
+    except IOError as e:
+      echo errPrefix() & " cannot write: " & e.msg
+      return 1
+    echo "wrote " & outPath
+    return 0
 
   proc runHtml(inputPath, outputArg, configArg: string,
       showBench: bool): int =
@@ -124,15 +179,7 @@ elif isMainModule:
       content = readFile(filePath)
       t = cpuTime() # start timer after reading file
     # Base options (used when no `--config` is given)
-    var markdownOptions = MarkdownOptions(
-      allowed: @[tagA, tagAbbr, tagB, tagBlockquote, tagBr,
-        tagCode, tagDel, tagEm, tagH1, tagH2, tagH3, tagH4, tagH5, tagH6,
-        tagHr, tagI, tagImg, tagLi, tagOl, tagP, tagPre, tagStrong, tagTable,
-        tagTbody, tagTd, tagTh, tagThead, tagTr, tagUl, tagDiv],
-      enableAnchors: false,
-      enableComponents: false,
-      componentBaseDir: ""
-    )
+    var markdownOptions = cliBaseOptions()
     if configArg.len > 0:
       # `-c, --config:<file>`: overlay JSON/YAML settings (snake_case) onto base
       try:
@@ -206,7 +253,7 @@ elif isMainModule:
     ## Rewrite `--flag value` (space form) to `--flag:value` for flags that
     ## take a value, since parseopt only attaches `:`/`=` values. A bare
     ## `--flag` (at the end or followed by another flag) is left untouched.
-    const valueFlags = ["--output", "--out", "-o", "--config", "-c"]
+    const valueFlags = ["--output", "--out", "-o", "--config", "-c", "--format"]
     result = @[]
     var i = 0
     while i < params.len:
@@ -223,14 +270,16 @@ elif isMainModule:
     var
       command = ""            # subcommand: `html` or `json`
       positionals: seq[string] = @[] # positional args after the subcommand (input.md, [output])
-      outputArg = ""          # `-o, --output:<file>`: write HTML to file instead of stdout
+      outputArg = ""          # `-o, --output:<file>`: output file (html result, json AST n/a, init starter)
       configArg = ""          # `-c, --config:<file>`: JSON/YAML settings file (snake_case keys)
+      formatArg = ""          # `--format:<json|yaml>`: starter file format for `init`
+      force = false           # `--force, -f`: overwrite the starter file if it exists
       showBench = false       # `--bench`: print conversion timing stats
       showHelp = false        # `-h, --help`: show usage
       showVersion = false     # `--version`: print version from .nimble
-    # shortNoVal={'h'} so `-c:cfg` / `-o:out` keep working as short options;
+    # shortNoVal={'h','f'} so `-c:cfg` / `-o:out` keep working as short options;
     # space forms (`-c cfg`, `--output out`) are normalized above
-    var p = initOptParser(normalizeArgs(commandLineParams()), shortNoVal = {'h'})
+    var p = initOptParser(normalizeArgs(commandLineParams()), shortNoVal = {'h', 'f'})
     for kind, key, val in p.getopt():
       case kind
       of cmdArgument:
@@ -255,6 +304,13 @@ elif isMainModule:
           # `-c, --config:<file>` (also `--config=file`, `-c file`):
           # JSON/YAML settings file with snake_case keys
           configArg = val
+        of "format":
+          # `--format:<json|yaml>` (also `--format=yaml`, `--format yaml`):
+          # starter file format for `init`
+          formatArg = val
+        of "force", "f":
+          # `--force, -f`: overwrite the starter file if it exists
+          force = true
         of "bench":
           # `--bench`: print timing stats after converting
           showBench = true
@@ -270,10 +326,16 @@ elif isMainModule:
     if showHelp or command == "" or command == "help":
       printHelp()
       return 0
-    if command notin ["html", "json"]:
+    if command notin ["html", "json", "init"]:
       echo errPrefix() & " unknown command: " & command
       printHelp()
       return 1
+    if command == "init":
+      if positionals.len > 0:
+        echo errPrefix() & " init takes no input file"
+        printHelp()
+        return 1
+      return runInit(formatArg, outputArg, force)
     if command == "html":
       if positionals.len == 0:
         printHelp()
