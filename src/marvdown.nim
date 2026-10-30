@@ -30,9 +30,12 @@ proc getAst*(content: sink string): string =
   var md = newMarkdown(content)
   md.toJson()
 
-when defined napi_build:
-  # Building Marvdown as a NAPI module
-  # This allows Marvdown to be used in Node.js/Bun.js applications 
+when defined(napi_build) and isMainModule:
+  # Building Marvdown itself as a NAPI module entry point. isMainModule
+  # keeps this out of plain dependency compiles: denim defines
+  # `napibuild` (== `napi_build`, Nim ignores underscores) for the whole
+  # closure, so without the entry check every addon transitively
+  # importing marvdown would declare a second `init proc`.
   import pkg/denim
 
   init proc(module: Module) =
