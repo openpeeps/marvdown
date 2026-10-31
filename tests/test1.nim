@@ -1287,3 +1287,34 @@ suite "elements_document":
       "<p>Para with <strong>bold</strong> and <a href=\"https://x.com\">link</a>.</p>" &
       "<ul><li>one</li><li>two</li></ul>" &
       "<pre><code class=\"\">code</code></pre>"
+
+suite "stored_ast":
+  test "round-trip preserves html":
+    let sample = "# Title\n\nPara with **bold**, *italic* and [link](https://x.com \"t\").\n\n- one\n- two\n\n```nim\ncode()\n```\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\n> quote\n\ntext[^1]\n\n[^1]: the note\n"
+    var md = newMarkdown(sample, noAnchors)
+    let html = md.toHtml()
+    assert astToHtml(md.toJson(), noAnchors) == html
+    assert astToHtml(nodesFromJson(md.toJson()), noAnchors) == html
+
+  test "round-trip with anchors":
+    let sample = "# Hello\n\n## Hello\n\nBody"
+    var md = newMarkdown(sample, opts)
+    assert astToHtml(md.toJson(), opts) == md.toHtml()
+
+  test "render options apply at render time":
+    var md = newMarkdown("# Hi", noAnchors)
+    let js = md.toJson()
+    assert astToHtml(js, noAnchors) == "<h1>Hi</h1>"
+    assert astToHtml(js, opts).contains("anchor-link")
+
+  test "malformed ast raises":
+    try:
+      discard astToHtml("[broken")
+      assert false, "expected ValueError"
+    except ValueError:
+      discard
+    try:
+      discard astToHtml("""[{"kind":"mdkNope"}]""")
+      assert false, "expected ValueError"
+    except ValueError:
+      discard

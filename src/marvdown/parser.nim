@@ -126,6 +126,8 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode)
 proc renderHtmlWithInnerMarkdown(md: var Markdown, rawHtml: string,
     tagName: string, line: int): string
 
+proc nodeFromJson*(node: JsonNode): MarkdownNode
+
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
   while i < offset and md.parser.curr.kind != mtkEOF:
@@ -1779,6 +1781,215 @@ proc renderHtmlWithInnerMarkdown(md: var Markdown, rawHtml: string,
 proc toJson*(md: Markdown): string =
   ## Convert the parsed Markdown AST to JSON
   toJson(md.ast)
+
+#
+# Stored AST: deserialize `json` command output back into nodes
+# and render it to HTML without re-parsing Markdown source
+#
+
+proc jsonStr(node: JsonNode, field, default: string): string =
+  ## Optional string field with a default (null/missing → default)
+  if node.hasKey(field):
+    let v = node[field]
+    if v.kind == JString:
+      return v.getStr()
+    if v.kind != JNull:
+      raise newException(ValueError, "AST field `" & field & "` must be a string")
+  default
+
+proc jsonInt(node: JsonNode, field: string, default: int): int =
+  ## Optional integer field with a default (null/missing → default)
+  if node.hasKey(field):
+    let v = node[field]
+    if v.kind == JInt:
+      return v.getInt()
+    if v.kind != JNull:
+      raise newException(ValueError, "AST field `" & field & "` must be an integer")
+  default
+
+proc jsonBool(node: JsonNode, field: string, default: bool): bool =
+  ## Optional boolean field with a default (null/missing → default)
+  if node.hasKey(field):
+    let v = node[field]
+    if v.kind == JBool:
+      return v.getBool()
+    if v.kind != JNull:
+      raise newException(ValueError, "AST field `" & field & "` must be a boolean")
+  default
+
+proc childrenFromJson(node: JsonNode): MarkdownNodeList =
+  ## Child list for container nodes; empty list when null/missing.
+  ## Mirrors the parser, which always creates a list for containers.
+  result = MarkdownNodeList()
+  if node.hasKey("children") and node["children"].kind == JObject:
+    let items = node["children"].getOrDefault("items")
+    if not items.isNil and items.kind == JArray:
+      for c in items.elems:
+        result.items.add(nodeFromJson(c))
+
+proc optChildren(node: JsonNode): MarkdownNodeList =
+  ## Child list for leaf nodes; nil when null/missing (mirrors the parser,
+  ## e.g. `newText` / `newImage` create no child list)
+  if node.hasKey("children") and node["children"].kind == JObject:
+    return childrenFromJson(node)
+  nil
+
+proc nodeFromJson*(node: JsonNode): MarkdownNode =
+  ## Deserialize one AST node from its JSON form (inverse of `toJson` output).
+  ## Raises `ValueError` on malformed input.
+  if node.isNil or node.kind != JObject:
+    raise newException(ValueError, "AST node must be a JSON object")
+  if not node.hasKey("kind") or node["kind"].kind != JString:
+    raise newException(ValueError, "AST node is missing string field: kind")
+  let kindStr = node["kind"].getStr()
+  let line = jsonInt(node, "line", 1)
+  case kindStr
+  of "mdkText":
+    result = MarkdownNode(kind: mdkText, text: jsonStr(node, "text", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkElement":
+    var attrs: seq[(string, string)] = @[]
+    if node.hasKey("attrs") and node["attrs"].kind == JArray:
+      for a in node["attrs"].elems:
+        if a.kind == JArray and a.elems.len == 2 and
+            a[0].kind == JString and a[1].kind == JString:
+          attrs.add((a[0].getStr(), a[1].getStr()))
+        else:
+          raise newException(ValueError, "AST element attrs must be [[name, value], ...]")
+    result = MarkdownNode(kind: mdkElement,
+      tag: html.getHtmlTag(jsonStr(node, "tag", "")), attrs: attrs, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkCodeBlock":
+    result = MarkdownNode(kind: mdkCodeBlock,
+      code: jsonStr(node, "code", ""),
+      codeLang: jsonStr(node, "codeLang", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkHeading":
+    let lvl = jsonInt(node, "level", 1)
+    if lvl notin 1 .. 6:
+      raise newException(ValueError, "AST heading level out of range: " & $lvl)
+    result = MarkdownNode(kind: mdkHeading, level: lvl, line: line)
+    if node.hasKey("textAnchor") and node["textAnchor"].kind == JString:
+      result.textAnchor = some(node["textAnchor"].getStr())
+    result.children = childrenFromJson(node)
+  of "mdkList":
+    result = MarkdownNode(kind: mdkList,
+      listOrdered: jsonBool(node, "listOrdered", false),
+      listStart: jsonInt(node, "listStart", 1), line: line)
+    result.children = childrenFromJson(node)
+  of "mdkListItem":
+    result = MarkdownNode(kind: mdkListItem, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkBlockquote":
+    result = MarkdownNode(kind: mdkBlockquote, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkAlert":
+    result = MarkdownNode(kind: mdkAlert,
+      alertType: jsonStr(node, "alertType", ""), line: line)
+    result.children = childrenFromJson(node)
+  of "mdkHorizontalRule":
+    result = MarkdownNode(kind: mdkHorizontalRule, line: line)
+  of "mdkLineBreak":
+    result = MarkdownNode(kind: mdkLineBreak, line: line)
+  of "mdkLink":
+    result = MarkdownNode(kind: mdkLink,
+      linkHref: jsonStr(node, "linkHref", ""),
+      linkTitle: jsonStr(node, "linkTitle", ""), line: line)
+    result.children = childrenFromJson(node)
+  of "mdkImage":
+    result = MarkdownNode(kind: mdkImage,
+      imageSrc: jsonStr(node, "imageSrc", ""),
+      imageAlt: jsonStr(node, "imageAlt", ""),
+      imageTitle: jsonStr(node, "imageTitle", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkEmphasis":
+    result = MarkdownNode(kind: mdkEmphasis, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkStrong":
+    result = MarkdownNode(kind: mdkStrong, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkStrikethrough":
+    result = MarkdownNode(kind: mdkStrikethrough, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkInlineCode":
+    result = MarkdownNode(kind: mdkInlineCode,
+      inlineCode: jsonStr(node, "inlineCode", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkHtml":
+    result = MarkdownNode(kind: mdkHtml,
+      html: jsonStr(node, "html", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkTable":
+    result = MarkdownNode(kind: mdkTable, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkTableHeader":
+    result = MarkdownNode(kind: mdkTableHeader, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkTableRow":
+    result = MarkdownNode(kind: mdkTableRow, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkTableFooter":
+    result = MarkdownNode(kind: mdkTableFooter, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkTableCell":
+    result = MarkdownNode(kind: mdkTableCell, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkParagraph":
+    result = MarkdownNode(kind: mdkParagraph, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkFootnoteDef":
+    result = MarkdownNode(kind: mdkFootnoteDef,
+      footnoteId: jsonStr(node, "footnoteId", ""), line: line)
+    result.children = childrenFromJson(node)
+  of "mdkFootnoteRef":
+    result = MarkdownNode(kind: mdkFootnoteRef,
+      footnoteRefId: jsonStr(node, "footnoteRefId", ""), line: line)
+    result.children = optChildren(node)
+  of "mdkDocument":
+    result = MarkdownNode(kind: mdkDocument, line: line)
+    result.children = childrenFromJson(node)
+  of "mdkUnknown":
+    result = MarkdownNode(kind: mdkUnknown,
+      info: jsonStr(node, "info", ""), line: line)
+    result.children = optChildren(node)
+  else:
+    raise newException(ValueError, "unknown AST node kind: " & kindStr)
+
+proc nodesFromJson*(s: string): seq[MarkdownNode] =
+  ## Deserialize a stored AST (`json` command output) back into nodes.
+  ## Raises `ValueError` on malformed input.
+  var root: JsonNode
+  try:
+    root = parseJson(s)
+  except JsonParsingError as e:
+    raise newException(ValueError, "invalid AST JSON: " & e.msg)
+  if root.kind != JArray:
+    raise newException(ValueError, "AST JSON must be an array of nodes")
+  for item in root.elems:
+    result.add(nodeFromJson(item))
+
+proc newMarkdownFromAst*(nodes: seq[MarkdownNode],
+    opts: MarkdownOptions = defaultOptions): Markdown =
+  ## Build a Markdown document from stored AST nodes for re-rendering to HTML.
+  ## Options control rendering (anchors, table classes, lazy-load, footnotes).
+  Markdown(
+    opts: opts,
+    ast: nodes,
+    selectors: newOrderedTable[string, string](),
+    selectorLevels: newOrderedTable[string, int](),
+    selectorCounter: newCountTable[string]()
+  )
+
+proc astToHtml*(nodes: seq[MarkdownNode],
+    opts: MarkdownOptions = defaultOptions): string =
+  ## Render stored AST nodes back to HTML without re-parsing Markdown source
+  var md = newMarkdownFromAst(nodes, opts)
+  md.toHtml()
+
+proc astToHtml*(astJson: string,
+    opts: MarkdownOptions = defaultOptions): string =
+  ## Parse stored AST JSON and render it back to HTML
+  astToHtml(nodesFromJson(astJson), opts)
 
 proc getSelectors*(md: Markdown): OrderedTableRef[string, string] =
   ## Get the headline selectors (anchors) from the parsed Markdown
