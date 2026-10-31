@@ -54,6 +54,10 @@ when defined(napi_build) and isMainModule:
       var md = newMarkdown(args.get("content").getStr)
       return %*(md.toJson())
 
+    proc astToHtml(content: string): napi_value {.export_napi.} =
+      ## Render stored AST JSON back to HTML via NAPI
+      return %*(parser.astToHtml(args.get("content").getStr))
+
 elif isMainModule:
   # Use Marvdown as standalone CLI application (stdlib only, no kapsis)
   import std/[os, parseopt, strutils, times, json]
@@ -101,10 +105,10 @@ elif isMainModule:
     echo grey("marvdown " & versionStr & " – stupid simple markdown parser") & "\n"
     echo grey("MIT license | Made by Humans from OpenPeeps\n  https://github.com/openpeeps/marvdown")
     echo ""
-    echo "usage: marvdown <html|json> input.md [options]"
+    echo "usage: marvdown <html|json|init> input [options]"
     echo ""
     echo label("commands:")
-    echo "  html <input.md>         " & grey("convert markdown to HTML (JSON envelope when parse_yaml is on)")
+    echo "  html <input>            " & grey("convert markdown (.md) or stored AST (.json) to HTML")
     echo "  json <input.md>         " & grey("export the markdown AST as JSON")
     echo "  init                    " & grey("write a starter .json/.yaml settings file")
     echo ""
@@ -190,14 +194,31 @@ elif isMainModule:
     if markdownOptions.componentBaseDir.len == 0:
       # default @include resolution to the input file's directory
       markdownOptions.componentBaseDir = filePath.parentDir()
-    var md = newMarkdown(content, markdownOptions)
-    let htmlStr = md.toHtml()
+    # `.json` input is a stored AST (`json` command output): render it
+    # directly, skipping lexing/parsing. Note: openparser's generic
+    # `fromJson` cannot build the `MarkdownNode` variant object, so the
+    # explicit `nodesFromJson` mapper is used instead.
+    let isAst = filePath.splitFile().ext.toLowerAscii() == ".json"
+    var htmlStr: string
+    var fields = newJObject()
+    if isAst:
+      var nodes: seq[MarkdownNode]
+      try:
+        nodes = nodesFromJson(content)
+      except CatchableError as e:
+        echo errPrefix() & " " & e.msg
+        return 1
+      htmlStr = astToHtml(nodes, markdownOptions)
+    else:
+      var md = newMarkdown(content, markdownOptions)
+      htmlStr = md.toHtml()
+      fields = md.headerJson()
     let output =
       if markdownOptions.parseYaml:
-        # envelope with front matter as JSON (fields = {} without front matter)
+        # envelope with front matter as JSON (fields = {} without front matter / AST)
         var envelope = newJObject()
         envelope["html"] = newJString(htmlStr)
-        envelope["fields"] = md.headerJson()
+        envelope["fields"] = fields
         $envelope
       else:
         htmlStr
@@ -268,7 +289,7 @@ elif isMainModule:
 
   proc main(): int =
     var
-      command = ""            # subcommand: `html` or `json`
+      command = ""            # subcommand: `html`, `json` or `init`
       positionals: seq[string] = @[] # positional args after the subcommand (input.md, [output])
       outputArg = ""          # `-o, --output:<file>`: output file (html result, json AST n/a, init starter)
       configArg = ""          # `-c, --config:<file>`: JSON/YAML settings file (snake_case keys)

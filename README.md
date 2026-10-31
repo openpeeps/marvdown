@@ -54,10 +54,10 @@ marvdown 0.2.6 – stupid simple markdown parser
 MIT license | Made by Humans from OpenPeeps
   https://github.com/openpeeps/marvdown
 
-usage: marvdown <html|json> input.md [options]
+usage: marvdown <html|json|init> input [options]
 
 commands:
-  html <input.md>         convert markdown to HTML (JSON envelope when parse_yaml is on)
+  html <input>            convert markdown (.md) or stored AST (.json) to HTML
   json <input.md>         export the markdown AST as JSON
   init                    write a starter .json/.yaml settings file
 
@@ -79,6 +79,8 @@ marvdown html sample.md --config options.json
 marvdown html sample.md --bench
 marvdown json sample.md
 marvdown json sample.md --config options.json
+marvdown html sample.ast.json
+marvdown html sample.ast.json --output page.html --config options.json
 marvdown init
 marvdown init --format yaml --output marvdown.yaml
 ```
@@ -284,6 +286,15 @@ echo marvdown.getAst(readFile("sample.md"))
   "children":{"items":[{"kind":"mdkText","text":"Hello","children":null,"line":1}]},
   "line":1}]
 ```
+Stored AST renders back to HTML without re-parsing (render options apply at render time):
+```nim
+let stored = marvdown.getAst(readFile("sample.md"))
+echo astToHtml(stored)                    # default options
+echo astToHtml(stored, opts)              # custom options
+echo astToHtml(nodesFromJson(stored))      # from parsed nodes
+```
+The CLI renders a stored AST the same way: `marvdown html` detects `.json`
+input and skips lexing/parsing (`marvdown html sample.ast.json`).
 
 ## Examples
 
@@ -297,6 +308,8 @@ nim c -r examples/example.nim
 nim c src/marvdown.nim
 ./marvdown html examples/sample.md
 ./marvdown json examples/sample.md
+./marvdown json examples/sample.md > sample.ast.json
+./marvdown html sample.ast.json
 ```
 
 ## Benchmarks
