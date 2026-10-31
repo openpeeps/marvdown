@@ -49,7 +49,7 @@ nimble install marvdown
 
 ### From the command line
 ```
-marvdown 0.2.6 – stupid simple markdown parser
+marvdown 0.2.7 – stupid simple markdown parser
 
 MIT license | Made by Humans from OpenPeeps
   https://github.com/openpeeps/marvdown
