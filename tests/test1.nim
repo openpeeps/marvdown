@@ -422,6 +422,25 @@ suite "bugfixes":
     var md = newMarkdown(sample, noAnchors)
     assert md.toHtml() == "<hr>"
 
+  test "soft break after inline keeps word boundary":
+    # https://github.com/openpeeps/marvdown — `**io_uring**\nbackend`
+    # rendered `</strong>backend` (space swallowed by the lexer)
+    let sample = "opt-in **io_uring**\nbackend, and more"
+    var md = newMarkdown(sample, noAnchors)
+    assert md.toHtml() == "<p>opt-in <strong>io_uring</strong> backend, and more</p>"
+
+  test "soft break between inline elements":
+    var md = newMarkdown("**a**\n**b**", noAnchors)
+    assert md.toHtml() == "<p><strong>a</strong> <strong>b</strong></p>"
+    md = newMarkdown("`c`\n*tail*", noAnchors)
+    assert md.toHtml() == "<p><code>c</code> <em>tail</em></p>"
+
+  test "no spurious space after inline on same line":
+    var md = newMarkdown("`Loop`. It is", noAnchors)
+    assert md.toHtml() == "<p><code>Loop</code>. It is</p>"
+    md = newMarkdown("*a\nb*", noAnchors)
+    assert md.toHtml() == "<p>*a b*</p>"
+
 suite "backtick_spans":
   test "single backtick code span":
     let sample = "`code`"

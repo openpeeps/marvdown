@@ -128,6 +128,18 @@ proc renderHtmlWithInnerMarkdown(md: var Markdown, rawHtml: string,
 
 proc nodeFromJson*(node: JsonNode): MarkdownNode
 
+proc hasSoftBreak(input: string, prevEnd, currStart: int): bool =
+  ## True when a line break sits in the source gap between two tokens.
+  ## Offsets (not line numbers) are compared: text tokens can span lines and
+  ## unmatched markers (`*a\nb*`) stay literal text, which line comparison
+  ## gets wrong.
+  if currStart <= prevEnd or prevEnd < 0 or currStart > input.len:
+    return false
+  for i in prevEnd ..< currStart:
+    if input[i] in {'\n', '\r'}:
+      return true
+  false
+
 proc advance*(md: var Markdown, offset = 1) =
   var i = 0
   while i < offset and md.parser.curr.kind != mtkEOF:
@@ -1304,6 +1316,25 @@ proc parseMarkdown(md: var Markdown, currentParagraph: var MarkdownNode) =
   # Main parsing loop: iterate through tokens and build the AST
   while md.parser.curr.kind != mtkEOF:
     let curr = md.parser.curr
+    # Soft line break inside a paragraph: the lexer swallows the newline, so an
+    # inline element directly followed by more paragraph content across a line
+    # break loses the word boundary (e.g. `**b**\ntail` renders `</strong>tail`).
+    # Restore it with a space. Only while a paragraph is open
+    # (`currentParagraph` is nil across block boundaries) and only for
+    # paragraph content; block tokens and hard breaks (`<br>`) are left alone.
+    if not currentParagraph.isNil and
+        (curr.kind == mtkText or
+          (curr.kind in inlineKinds and curr.kind != mtkLineBreak)) and
+        md.parser.prev.kind in {mtkStrong, mtkEmphasis, mtkStrikethrough,
+          mtkLink, mtkImage, mtkInlineCode, mtkFootnoteRef, mtkRefLink, mtkHtml} and
+        hasSoftBreak(md.parser.lexer.input, md.parser.prev.post,
+          curr.post - curr.token.len):
+      withCurrentParagraph do:
+        currentParagraph.children.items.add(MarkdownNode(
+          kind: mdkText,
+          text: " ",
+          line: curr.line
+        ))
     case curr.kind
     of mtkText:
       withCurrentParagraph do:

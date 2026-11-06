@@ -209,10 +209,14 @@ suite "commonmark_atx_headings":
 
 suite "commonmark_setext_headings":
   test "basic level 1 and 2 (Example 80)":
-    check html("Foo *bar*\n=========") == "<p>Foo <em>bar</em>=========</p>"
+    # DIVERGENCE: setext underline after inline content stays literal text
+    # (spec: <h1>); the soft break before it keeps its word-boundary space.
+    check html("Foo *bar*\n=========") == "<p>Foo <em>bar</em> =========</p>"
     check html("Foo *bar*\n---------") == "<p>Foo <em>bar</em></p><hr>"
   test "multiline content (Example 81)":
-    check html("Foo *bar\nbaz*\n====") == "<p>Foo *bar baz*====</p>"
+    # DIVERGENCE: multiline emphasis stays literal in marvdown (spec: <h1>);
+    # soft-break spaces are preserved.
+    check html("Foo *bar\nbaz*\n====") == "<p>Foo *bar baz* ====</p>"
   test "any length underline (Example 83)":
     check html("Foo\n-------------------------") == "<h2>Foo</h2>"
     check html("Foo\n=") == "<p>Foo =</p>"
