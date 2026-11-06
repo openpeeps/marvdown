@@ -33,6 +33,12 @@
 <li><a class="reference external"
           data-doc-search-tag="parser: proc advance(md: var Markdown; offset = 1)" href="marvdown/parser.html#advance%2CMarkdown%2Cint">parser: proc advance(md: var Markdown; offset = 1)</a></li>
           </ul></dd>
+<dt><a name="astToHtml" href="#astToHtml"><span>astToHtml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc astToHtml(nodes: seq[MarkdownNode]; opts: MarkdownOptions = defaultOptions): string" href="marvdown/parser.html#astToHtml%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions">parser: proc astToHtml(nodes: seq[MarkdownNode]; opts: MarkdownOptions = defaultOptions): string</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="parser: proc astToHtml(astJson: string; opts: MarkdownOptions = defaultOptions): string" href="marvdown/parser.html#astToHtml%2Cstring%2CMarkdownOptions">parser: proc astToHtml(astJson: string; opts: MarkdownOptions = defaultOptions): string</a></li>
+          </ul></dd>
 <dt><a name="ComponentScope" href="#ComponentScope"><span>ComponentScope:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="components: type ComponentScope" href="marvdown/components.html#ComponentScope">components: type ComponentScope</a></li>
@@ -381,6 +387,12 @@
 <li><a class="reference external"
           data-doc-search-tag="parser: proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown" href="marvdown/parser.html#newMarkdown%2Csinkstring%2CMarkdownOptions">parser: proc newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown</a></li>
           </ul></dd>
+<dt><a name="newMarkdownFromAst" href="#newMarkdownFromAst"><span>newMarkdownFromAst:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc newMarkdownFromAst(nodes: seq[MarkdownNode];
+                   opts: MarkdownOptions = defaultOptions): Markdown" href="marvdown/parser.html#newMarkdownFromAst%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions">parser: proc newMarkdownFromAst(nodes: seq[MarkdownNode];
+                   opts: MarkdownOptions = defaultOptions): Markdown</a></li>
+          </ul></dd>
 <dt><a name="newParagraph" href="#newParagraph"><span>newParagraph:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc newParagraph(curr: MarkdownTokenTuple): MarkdownNode" href="marvdown/parser.html#newParagraph%2CMarkdownTokenTuple">parser: proc newParagraph(curr: MarkdownTokenTuple): MarkdownNode</a></li>
@@ -396,6 +408,14 @@
 <dt><a name="nextToken" href="#nextToken"><span>nextToken:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple" href="marvdown/lexer.html#nextToken%2CMarkdownLexer">lexer: proc nextToken(lex: var MarkdownLexer): MarkdownTokenTuple</a></li>
+          </ul></dd>
+<dt><a name="nodeFromJson" href="#nodeFromJson"><span>nodeFromJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc nodeFromJson(node: JsonNode): MarkdownNode" href="marvdown/parser.html#nodeFromJson%2CJsonNode">parser: proc nodeFromJson(node: JsonNode): MarkdownNode</a></li>
+          </ul></dd>
+<dt><a name="nodesFromJson" href="#nodesFromJson"><span>nodesFromJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc nodesFromJson(s: string): seq[MarkdownNode]" href="marvdown/parser.html#nodesFromJson%2Cstring">parser: proc nodesFromJson(s: string): seq[MarkdownNode]</a></li>
           </ul></dd>
 <dt><a name="optionsFromJson" href="#optionsFromJson"><span>optionsFromJson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -475,7 +495,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:58:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-06 22:56:52 UTC</small>
       </div>
     </div>
   </div>

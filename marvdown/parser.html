@@ -148,6 +148,11 @@
   <li><a class="reference" href="#advance%2CMarkdown%2Cint" title="advance(md: var Markdown; offset = 1)">advance(md: var Markdown; offset = 1)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">astToHtml
+  <li><a class="reference" href="#astToHtml%2Cstring%2CMarkdownOptions" title="astToHtml(astJson: string; opts: MarkdownOptions = defaultOptions): string">astToHtml(astJson: string; opts: MarkdownOptions = defaultOptions): string</a></li>
+<li><a class="reference" href="#astToHtml%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions" title="astToHtml(nodes: seq[MarkdownNode]; opts: MarkdownOptions = defaultOptions): string">astToHtml(nodes: seq[MarkdownNode]; opts: MarkdownOptions = defaultOptions): string</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">configJsonString
   <li><a class="reference" href="#configJsonString%2CMarkdownOptions" title="configJsonString(opts: MarkdownOptions): string">configJsonString(opts: MarkdownOptions): string</a></li>
 
@@ -208,8 +213,22 @@
   <li><a class="reference" href="#newMarkdown%2Csinkstring%2CMarkdownOptions" title="newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown">newMarkdown(content: sink string; opts: MarkdownOptions = defaultOptions): Markdown</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">newMarkdownFromAst
+  <li><a class="reference" href="#newMarkdownFromAst%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions" title="newMarkdownFromAst(nodes: seq[MarkdownNode];
+                   opts: MarkdownOptions = defaultOptions): Markdown">newMarkdownFromAst(nodes: seq[MarkdownNode];
+                   opts: MarkdownOptions = defaultOptions): Markdown</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">newParagraph
   <li><a class="reference" href="#newParagraph%2CMarkdownTokenTuple" title="newParagraph(curr: MarkdownTokenTuple): MarkdownNode">newParagraph(curr: MarkdownTokenTuple): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">nodeFromJson
+  <li><a class="reference" href="#nodeFromJson%2CJsonNode" title="nodeFromJson(node: JsonNode): MarkdownNode">nodeFromJson(node: JsonNode): MarkdownNode</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">nodesFromJson
+  <li><a class="reference" href="#nodesFromJson%2Cstring" title="nodesFromJson(s: string): seq[MarkdownNode]">nodesFromJson(s: string): seq[MarkdownNode]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">optionsFromJson
@@ -376,6 +395,28 @@
   <dd>
     
     
+    
+  </dd>
+</div>
+
+</div>
+<div id="astToHtml-procs-all">
+  <div id="astToHtml,string,MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#astToHtml%2Cstring%2CMarkdownOptions"><span class="Identifier">astToHtml</span></a><span class="Other">(</span><span class="Identifier">astJson</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Parse stored AST JSON and render it back to HTML
+    
+  </dd>
+</div>
+<div id="astToHtml,seq[MarkdownNode],MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#astToHtml%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions"><span class="Identifier">astToHtml</span></a><span class="Other">(</span><span class="Identifier">nodes</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Render stored AST nodes back to HTML without re-parsing Markdown source
     
   </dd>
 </div>
@@ -559,6 +600,19 @@
 </div>
 
 </div>
+<div id="newMarkdownFromAst-procs-all">
+  <div id="newMarkdownFromAst,seq[MarkdownNode],MarkdownOptions">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newMarkdownFromAst%2Cseq%5BMarkdownNode%5D%2CMarkdownOptions"><span class="Identifier">newMarkdownFromAst</span></a><span class="Other">(</span><span class="Identifier">nodes</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span><span class="Other">;</span>
+                        <span class="Identifier">opts</span><span class="Other">:</span> <a href="#MarkdownOptions"><span class="Identifier">MarkdownOptions</span></a> <span class="Other">=</span> <span class="Identifier">defaultOptions</span><span class="Other">)</span><span class="Other">:</span> <a href="#Markdown"><span class="Identifier">Markdown</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Build a Markdown document from stored AST nodes for re-rendering to HTML. Options control rendering (anchors, table classes, lazy-load, footnotes).
+    
+  </dd>
+</div>
+
+</div>
 <div id="newParagraph-procs-all">
   <div id="newParagraph,MarkdownTokenTuple">
   <dt><pre><span class="Keyword">proc</span> <a href="#newParagraph%2CMarkdownTokenTuple"><span class="Identifier">newParagraph</span></a><span class="Other">(</span><span class="Identifier">curr</span><span class="Other">:</span> <a href="lexer.html#MarkdownTokenTuple"><span class="Identifier">MarkdownTokenTuple</span></a><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
@@ -566,6 +620,31 @@
   <dd>
     
     Create a new empty paragraph node
+    
+  </dd>
+</div>
+
+</div>
+<div id="nodeFromJson-procs-all">
+  <div id="nodeFromJson,JsonNode">
+  <dt><pre><span class="Keyword">proc</span> <a href="#nodeFromJson%2CJsonNode"><span class="Identifier">nodeFromJson</span></a><span class="Other">(</span><span class="Identifier">node</span><span class="Other">:</span> <span class="Identifier">JsonNode</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="nodesFromJson-procs-all">
+  <div id="nodesFromJson,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#nodesFromJson%2Cstring"><span class="Identifier">nodesFromJson</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="ast.html#MarkdownNode"><span class="Identifier">MarkdownNode</span></a><span class="Other">]</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Deserialize a stored AST (<tt class="docutils literal"><span class="pre"><span class="Identifier">json</span></span></tt> command output) back into nodes. Raises <tt class="docutils literal"><span class="pre"><span class="Identifier">ValueError</span></span></tt> on malformed input.
     
   </dd>
 </div>
@@ -664,7 +743,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-30 21:58:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-06 22:56:52 UTC</small>
       </div>
     </div>
   </div>
